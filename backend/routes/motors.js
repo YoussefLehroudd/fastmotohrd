@@ -5,26 +5,42 @@ const db = require('../db');
 // Get all public motors with current booking status
 router.get('/public', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Get motors with their current booking status
+    // Get motors with their current booking status and brand info
     const [motors] = await db.query(
       `SELECT m.*, 
         b.endDate as available_after,
         CASE 
           WHEN b.id IS NOT NULL AND b.status = 'confirmed' THEN 'booked'
           ELSE 'available'
-        END as current_status
+        END as current_status,
+        m.brand,
+        m.model,
+        CASE WHEN b.returnTime IS NOT NULL THEN
+          CONCAT(
+            CASE 
+              WHEN HOUR(b.returnTime) > 12 
+              THEN HOUR(b.returnTime) - 12 
+              WHEN HOUR(b.returnTime) = 0 
+              THEN 12
+              ELSE HOUR(b.returnTime)
+            END,
+            ':',
+            LPAD(MINUTE(b.returnTime), 2, '0'),
+            ' ',
+            CASE WHEN HOUR(b.returnTime) >= 12 THEN 'PM' ELSE 'AM' END
+          )
+        END as returnTime
       FROM motors m
-      LEFT JOIN (
-        SELECT motorId, endDate, status, id
-        FROM bookings 
-        WHERE status = 'confirmed'
-        AND startDate <= ?
-        AND endDate >= ?
-      ) b ON m.id = b.motorId
-      WHERE m.isActive = 1`,
-      [today, today]
+      LEFT JOIN bookings b ON m.id = b.motorId AND b.status = 'confirmed'
+      WHERE m.isActive = 1
+      AND (b.id IS NULL OR b.id = (
+        SELECT b2.id
+        FROM bookings b2
+        WHERE b2.motorId = m.id
+        AND b2.status = 'confirmed'
+        ORDER BY b2.startDate DESC
+        LIMIT 1
+      ))`
     );
 
     res.json(motors);
@@ -38,25 +54,40 @@ router.get('/public', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const today = new Date().toISOString().split('T')[0];
-
     const [motor] = await db.query(
       `SELECT m.*, 
         b.endDate as available_after,
         CASE 
           WHEN b.id IS NOT NULL AND b.status = 'confirmed' THEN 'booked'
           ELSE 'available'
-        END as current_status
+        END as current_status,
+        CASE WHEN b.returnTime IS NOT NULL THEN
+          CONCAT(
+            CASE 
+              WHEN HOUR(b.returnTime) > 12 
+              THEN HOUR(b.returnTime) - 12 
+              WHEN HOUR(b.returnTime) = 0 
+              THEN 12
+              ELSE HOUR(b.returnTime)
+            END,
+            ':',
+            LPAD(MINUTE(b.returnTime), 2, '0'),
+            ' ',
+            CASE WHEN HOUR(b.returnTime) >= 12 THEN 'PM' ELSE 'AM' END
+          )
+        END as returnTime
       FROM motors m
-      LEFT JOIN (
-        SELECT motorId, endDate, status, id
-        FROM bookings 
-        WHERE status = 'confirmed'
-        AND startDate <= ?
-        AND endDate >= ?
-      ) b ON m.id = b.motorId
-      WHERE m.id = ?`,
-      [today, today, id]
+      LEFT JOIN bookings b ON m.id = b.motorId AND b.status = 'confirmed'
+      WHERE m.id = ?
+      AND (b.id IS NULL OR b.id = (
+        SELECT b2.id
+        FROM bookings b2
+        WHERE b2.motorId = m.id
+        AND b2.status = 'confirmed'
+        ORDER BY b2.startDate DESC
+        LIMIT 1
+      ))`,
+      [id]
     );
 
     if (!motor.length) {

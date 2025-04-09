@@ -4,7 +4,7 @@ const db = require('../db');
 
 router.get('/', async (req, res) => {
   try {
-    const [countries] = await db.query('SELECT DISTINCT * FROM countries ORDER BY name');
+    const [countries] = await db.query('SELECT DISTINCT name, code, flag, flag_image FROM countries ORDER BY name');
     res.json(countries);
   } catch (error) {
     console.error('Error fetching countries:', error);
