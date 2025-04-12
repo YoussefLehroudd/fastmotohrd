@@ -30,13 +30,17 @@ router.get('/', verifyToken, async (req, res) => {
 router.get('/:id', verifyToken, async (req, res) => {
   try {
     const [booking] = await db.query(
-      `SELECT b.*, m.title as motorName, m.imageUrl, m.brand, m.model,
-              u.username as customerName, seller.username as sellerName,
-              b.location
+      `SELECT b.*, m.id as motorId, m.title as motorName, m.imageUrl, m.brand, m.model,
+              u.username as customerName, u.email as customerEmail, u.phone as customerPhone,
+              seller.username as sellerName,
+              ml.address, ml.city,
+              p.paymentMethod, p.status as paymentStatus, p.notes as paymentNotes
        FROM bookings b
        JOIN motors m ON b.motorId = m.id
        JOIN users u ON b.userId = u.id
        JOIN users seller ON m.sellerId = seller.id
+       LEFT JOIN motor_locations ml ON b.locationId = ml.id
+       LEFT JOIN payments p ON b.id = p.bookingId
        WHERE b.id = ? AND (b.userId = ? OR m.sellerId = ?)`,
       [req.params.id, req.user.id, req.user.id]
     );
@@ -77,11 +81,11 @@ router.post('/', verifyToken, async (req, res) => {
       return res.status(404).json({ message: 'Motor not found or not available for rent' });
     }
 
-    // Check for date conflicts
+    // Check for confirmed booking conflicts
     const [conflicts] = await connection.query(
       `SELECT id FROM bookings 
        WHERE motorId = ? 
-       AND status != 'cancelled'
+       AND status = 'confirmed'
        AND ((startDate BETWEEN ? AND ?) 
        OR (endDate BETWEEN ? AND ?)
        OR (? BETWEEN startDate AND endDate))`,
@@ -110,12 +114,12 @@ router.post('/', verifyToken, async (req, res) => {
       ? `${locationDetails[0].city.toLowerCase()}, ${locationDetails[0].address.toLowerCase()}`
       : locationId;
 
-    // Create booking with location
+    // Create booking with location and default status
     const [result] = await connection.query(
       `INSERT INTO bookings (
         motorId, userId, startDate, endDate, pickupTime, returnTime,
-        location, totalPrice, depositAmount, specialRequests
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        location, totalPrice, depositAmount, specialRequests, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         motorId, req.user.id, startDate, endDate, pickupTime, returnTime,
         formattedLocation, totalPrice, depositAmount, specialRequests
@@ -123,12 +127,13 @@ router.post('/', verifyToken, async (req, res) => {
     );
 
 
-    // Create initial payment record with selected payment method
+    // Create initial payment record with selected payment method and default status
     const { paymentMethod } = req.body;
+    const paymentStatus = paymentMethod === 'cash_on_delivery' ? 'pending' : 'awaiting_confirmation';
     await connection.query(
       `INSERT INTO payments (bookingId, amount, paymentMethod, status)
        VALUES (?, ?, ?, ?)`,
-      [result.insertId, totalPrice, paymentMethod, paymentMethod === 'stripe' ? 'pending' : 'awaiting_confirmation']
+      [result.insertId, totalPrice, paymentMethod, paymentStatus]
     );
 
     // Send notifications
@@ -188,10 +193,25 @@ router.post('/', verifyToken, async (req, res) => {
 router.patch('/:id/status', verifyToken, async (req, res) => {
   const connection = await db.getConnection();
   try {
-    const { status } = req.body;
+    const { status, validatePayment } = req.body;
     const bookingId = req.params.id;
 
     await connection.beginTransaction();
+
+    // If marking as completed and validatePayment is true, validate the payment
+    if (status === 'completed' && validatePayment) {
+      const [payment] = await connection.query(
+        'SELECT id FROM payments WHERE bookingId = ?',
+        [bookingId]
+      );
+      
+      if (payment.length > 0) {
+        await connection.query(
+          'UPDATE payments SET status = ?, notes = ? WHERE id = ?',
+          ['paid', 'Payment validated on order completion', payment[0].id]
+        );
+      }
+    }
 
     // Get booking details with location
     const [booking] = await connection.query(
@@ -273,6 +293,7 @@ router.patch('/:id/status', verifyToken, async (req, res) => {
     connection.release();
   }
 });
+
 
 // Get payment for a booking (redirect to payments route)
 router.get('/:id/payment', verifyToken, async (req, res) => {

@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get all reviews for a seller
-router.get('/seller/:sellerId', async (req, res) => {
+router.get('/seller/:sellerId', verifyToken, async (req, res) => {
   try {
     const { sellerId } = req.params;
     
@@ -162,8 +162,101 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
+// Update a review
+router.put('/:reviewId', verifyToken, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.user.id;
+    const { rating, comment } = req.body;
+
+    // Verify the review exists and belongs to the user
+    const [review] = await db.query(
+      'SELECT * FROM reviews WHERE id = ? AND user_id = ?',
+      [reviewId, userId]
+    );
+
+    if (!review.length) {
+      return res.status(404).json({ error: 'Review not found or unauthorized' });
+    }
+
+    // Update the review
+    await db.query(
+      `UPDATE reviews 
+       SET rating = ?, comment = ?
+       WHERE id = ? AND user_id = ?`,
+      [rating, comment, reviewId, userId]
+    );
+
+    // Get updated review with user info
+    const [updatedReview] = await db.query(
+      `SELECT r.*, u.username as name, u.profileImageUrl as profile_image_url
+       FROM reviews r
+       JOIN users u ON r.user_id = u.id
+       WHERE r.id = ?`,
+      [reviewId]
+    );
+
+    res.json({
+      id: updatedReview[0].id,
+      user_id: updatedReview[0].user_id,
+      rating: updatedReview[0].rating,
+      comment: updatedReview[0].comment,
+      created_at: updatedReview[0].created_at,
+      seller_response: updatedReview[0].seller_response,
+      name: updatedReview[0].name,
+      profile_image_url: updatedReview[0].profile_image_url
+    });
+  } catch (error) {
+    console.error('Error updating review:', error);
+    res.status(500).json({ error: 'Failed to update review' });
+  }
+});
+
 // Add seller response to a review
 router.post('/:reviewId/response', verifyToken, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const { response } = req.body;
+    const sellerId = req.user.id;
+
+    // Verify seller owns the motor and response doesn't exist
+    const [review] = await db.query(
+      `SELECT r.*, m.sellerId 
+       FROM reviews r
+       JOIN motors m ON r.motor_id = m.id
+       WHERE r.id = ?`,
+      [reviewId]
+    );
+
+    if (!review.length) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+
+    if (review[0].sellerId !== sellerId) {
+      return res.status(403).json({ error: 'Not authorized to respond to this review' });
+    }
+
+    if (review[0].seller_response) {
+      return res.status(400).json({ error: 'Response already exists. Use PUT to update.' });
+    }
+
+    // Add seller response
+    await db.query(
+      `UPDATE reviews 
+       SET seller_response = ?
+       WHERE id = ?`,
+      [response, reviewId]
+    );
+
+    res.json({ message: 'Response added successfully' });
+  } catch (error) {
+    console.error('Error adding response:', error);
+    res.status(500).json({ error: 'Failed to add response' });
+  }
+});
+
+// Update seller response
+router.put('/:reviewId/response', verifyToken, async (req, res) => {
   try {
     const { reviewId } = req.params;
     const { response } = req.body;
@@ -186,7 +279,7 @@ router.post('/:reviewId/response', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to respond to this review' });
     }
 
-    // Add seller response
+    // Add or update seller response
     await db.query(
       `UPDATE reviews 
        SET seller_response = ?
@@ -194,10 +287,86 @@ router.post('/:reviewId/response', verifyToken, async (req, res) => {
       [response, reviewId]
     );
 
-    res.json({ message: 'Response added successfully' });
+    res.json({ message: 'Response updated successfully' });
   } catch (error) {
-    console.error('Error adding seller response:', error);
-    res.status(500).json({ error: 'Failed to add response' });
+    console.error('Error updating response:', error);
+    res.status(500).json({ error: 'Failed to update response' });
+  }
+});
+
+// Delete seller response
+router.delete('/:reviewId/response', verifyToken, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const sellerId = req.user.id;
+
+    // Verify seller owns the motor
+    const [review] = await db.query(
+      `SELECT r.*, m.sellerId 
+       FROM reviews r
+       JOIN motors m ON r.motor_id = m.id
+       WHERE r.id = ?`,
+      [reviewId]
+    );
+
+    if (!review.length) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+
+    if (review[0].sellerId !== sellerId) {
+      return res.status(403).json({ error: 'Not authorized to delete this response' });
+    }
+
+    // Delete seller response
+    await db.query(
+      `UPDATE reviews 
+       SET seller_response = NULL
+       WHERE id = ?`,
+      [reviewId]
+    );
+
+    res.json({ message: 'Response deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting response:', error);
+    res.status(500).json({ error: 'Failed to delete response' });
+  }
+});
+
+// Delete a review
+router.delete('/:reviewId', verifyToken, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin';
+
+    // Get review with motor seller info
+    const [review] = await db.query(
+      `SELECT r.*, m.sellerId 
+       FROM reviews r
+       JOIN motors m ON r.motor_id = m.id
+       WHERE r.id = ?`,
+      [reviewId]
+    );
+
+    if (!review.length) {
+      return res.status(404).json({ error: 'Review not found' });
+    }
+
+    // Allow deletion if user is admin, review owner, or the seller of the motor
+    if (!isAdmin && review[0].user_id !== userId && review[0].sellerId !== userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this review' });
+    }
+
+    // Delete the review
+    await db.query(
+      'DELETE FROM reviews WHERE id = ?',
+      [reviewId]
+    );
+
+    res.json({ message: 'Review deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting review:', error);
+    res.status(500).json({ error: 'Failed to delete review' });
   }
 });
 

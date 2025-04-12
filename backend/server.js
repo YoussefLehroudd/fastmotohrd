@@ -559,7 +559,7 @@ app.get('/api/motors/public', async (req, res) => {
     const [motors] = await db.query(`
       SELECT m.*, u.username as sellerName,
         CASE 
-          WHEN b.id IS NOT NULL AND b.status IN ('confirmed', 'pending') THEN 'booked'
+          WHEN b.id IS NOT NULL AND b.status IN ('confirmed') THEN 'booked'
           ELSE 'available'
         END as current_status,
         CASE
@@ -571,7 +571,7 @@ app.get('/api/motors/public', async (req, res) => {
       LEFT JOIN (
         SELECT motorId, endDate, returnTime, status, id
         FROM bookings 
-        WHERE status IN ('confirmed', 'pending')
+        WHERE status IN ('confirmed')
         AND ((startDate = ? AND pickupTime > ?)
           OR startDate > ?
           OR (endDate = ? AND returnTime > ?)
@@ -673,7 +673,7 @@ app.patch('/api/motors/:id', verifyToken, upload.single('image'), async (req, re
   try {
     const { 
       title, description, price, dailyRate, isAvailableForRent, isActive,
-      brand, model, year
+      brand, model, year, motorType
     } = req.body;
     let imageUrl = undefined; // undefined means don't update the image
     
@@ -695,6 +695,7 @@ app.patch('/api/motors/:id', verifyToken, upload.single('image'), async (req, re
     if (brand !== undefined) { updateFields.push('brand = ?'); updateValues.push(brand || null); }
     if (model !== undefined) { updateFields.push('model = ?'); updateValues.push(model || null); }
     if (year !== undefined) { updateFields.push('year = ?'); updateValues.push(parseInt(year) || null); }
+    if (motorType !== undefined) { updateFields.push('motorType = ?'); updateValues.push(motorType); }
 
     // Add the WHERE clause parameters
     updateValues.push(req.params.id, req.user.id);
@@ -818,6 +819,7 @@ app.use('/api/seller', sellerRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationsRoutes);
 // Mount reviews routes
+app.use('/api/reviews', reviewsRoutes);
 app.use('/api/motors/:motorId/reviews', (req, res, next) => {
   req.motorId = req.params.motorId;
   next();

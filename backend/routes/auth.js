@@ -193,6 +193,9 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Incorrect password. Please try again.' });
     }
 
+    // Clear any existing OTP for this email
+    otpStore.delete(email);
+
     const otp = generateOTP();
     const expiryTime = Date.now() + 5 * 60 * 1000;
     
@@ -203,7 +206,10 @@ router.post('/login', async (req, res) => {
       role: user.role
     });
 
-    await sendLoginOTP(email, otp);
+    const emailSent = await sendLoginOTP(email, otp);
+    if (!emailSent) {
+      return res.status(500).json({ message: 'Failed to send OTP email. Please try again.' });
+    }
     
     res.json({ 
       message: 'OTP sent to your email',
@@ -224,6 +230,11 @@ router.post('/verify-otp', async (req, res) => {
     if (!storedData || Date.now() > storedData.expiryTime) {
       otpStore.delete(email);
       return res.status(400).json({ message: 'OTP expired or invalid. Please try logging in again.' });
+    }
+
+    // Validate OTP format
+    if (!/^\d{6}$/.test(otp)) {
+      return res.status(400).json({ message: 'OTP must be exactly 6 digits' });
     }
 
     if (otp !== storedData.otp) {
@@ -262,24 +273,36 @@ router.post('/verify-otp', async (req, res) => {
 router.post('/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
-    const storedData = otpStore.get(email);
+    
+    // First check if user exists and get user data
+    const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    if (users.length === 0) {
+      return res.status(404).json({ message: 'No account found with this email address' });
+    }
 
-    if (!storedData) {
-      return res.status(400).json({ message: 'No active login session. Please login again.' });
+    const user = users[0];
+
+    // Check if user is blocked
+    if (user.isBlocked) {
+      return res.status(403).json({ message: 'Your account has been blocked. Please contact support.' });
     }
 
     // Generate new OTP
     const otp = generateOTP();
     const expiryTime = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
 
-    // Update stored data with new OTP
+    // Store new OTP data
     otpStore.set(email, {
-      ...storedData,
       otp,
-      expiryTime
+      expiryTime,
+      userId: user.id,
+      role: user.role
     });
 
-    await sendLoginOTP(email, otp);
+    const emailSent = await sendLoginOTP(email, otp);
+    if (!emailSent) {
+      return res.status(500).json({ message: 'Failed to send OTP email. Please try again.' });
+    }
 
     res.json({ 
       message: 'New OTP sent to your email',

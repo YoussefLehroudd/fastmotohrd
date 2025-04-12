@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const bcrypt = require('bcryptjs');
-const { authenticateSeller } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth');
 const { generateOTP, sendLoginOTP, sendPasswordChangeNotification } = require('../utils/emailService');
 const multer = require('multer');
 const path = require('path');
@@ -55,7 +55,7 @@ router.get('/profile/:id', async (req, res) => {
 });
 
 // Get seller profile (authenticated)
-router.get('/profile', authenticateSeller, async (req, res) => {
+router.get('/profile', verifyToken, async (req, res) => {
   try {
     const [profile] = await db.query(
       'SELECT id, username, email, phone, countryCode, address, bio, profileImageUrl FROM users WHERE id = ?',
@@ -74,7 +74,7 @@ router.get('/profile', authenticateSeller, async (req, res) => {
 });
 
 // Update seller profile
-router.patch('/profile', authenticateSeller, upload.single('image'), async (req, res) => {
+router.patch('/profile', verifyToken, upload.single('image'), async (req, res) => {
   try {
     const { name, email, phone, countryCode, address, bio } = req.body;
     const updates = [];
@@ -136,7 +136,7 @@ router.patch('/profile', authenticateSeller, upload.single('image'), async (req,
 });
 
 // Get seller dashboard stats
-router.get('/stats', authenticateSeller, async (req, res) => {
+router.get('/stats', verifyToken, async (req, res) => {
   try {
     const sellerId = req.user.id;
 
@@ -201,7 +201,7 @@ router.get('/stats', authenticateSeller, async (req, res) => {
 });
 
 // Get seller orders
-router.get('/orders', authenticateSeller, async (req, res) => {
+router.get('/orders', verifyToken, async (req, res) => {
   try {
     const sellerId = req.user.id;
     const [orders] = await db.query(
@@ -210,16 +210,26 @@ router.get('/orders', authenticateSeller, async (req, res) => {
               CASE 
                 WHEN b.endDate IS NULL THEN 'SALE'
                 ELSE 'RENTAL'
-              END as type
+              END as type,
+              p.paymentMethod, p.status as paymentStatus
        FROM bookings b 
        JOIN motors m ON b.motorId = m.id 
        JOIN users u ON b.userId = u.id
+       LEFT JOIN payments p ON b.id = p.bookingId
        WHERE m.sellerId = ?
        ORDER BY b.created_at DESC`,
       [sellerId]
     );
 
-    res.json(orders);
+    const ordersWithPayment = orders.map(order => ({
+      ...order,
+      payment: {
+        paymentMethod: order.paymentMethod,
+        status: order.paymentStatus
+      }
+    }));
+
+    res.json(ordersWithPayment);
   } catch (error) {
     console.error('Error fetching seller orders:', error);
     res.status(500).json({ message: 'Error fetching orders' });
@@ -227,7 +237,7 @@ router.get('/orders', authenticateSeller, async (req, res) => {
 });
 
 // Update payment status
-router.patch('/payments/:id', authenticateSeller, async (req, res) => {
+router.patch('/payments/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -260,7 +270,7 @@ router.patch('/payments/:id', authenticateSeller, async (req, res) => {
 });
 
 // Get seller payments
-router.get('/payments', authenticateSeller, async (req, res) => {
+router.get('/payments', verifyToken, async (req, res) => {
   try {
     const sellerId = req.user.id;
     const [payments] = await db.query(
@@ -359,7 +369,7 @@ router.get('/:id/reviews', async (req, res) => {
 });
 
 // Add response to a review
-router.post('/reviews/:id/respond', authenticateSeller, async (req, res) => {
+router.post('/reviews/:id/respond', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { response } = req.body;
@@ -391,7 +401,7 @@ router.post('/reviews/:id/respond', authenticateSeller, async (req, res) => {
 });
 
 // Change email with OTP verification
-router.post('/change-email', authenticateSeller, async (req, res) => {
+router.post('/change-email', verifyToken, async (req, res) => {
   try {
     const { newEmail, currentPassword } = req.body;
     
@@ -432,7 +442,7 @@ router.post('/change-email', authenticateSeller, async (req, res) => {
 });
 
 // Verify OTP and complete email change
-router.post('/verify-email-change', authenticateSeller, async (req, res) => {
+router.post('/verify-email-change', verifyToken, async (req, res) => {
   try {
     const { newEmail, otp } = req.body;
     const storedData = otpStore.get(newEmail);
@@ -458,7 +468,7 @@ router.post('/verify-email-change', authenticateSeller, async (req, res) => {
 });
 
 // Change password
-router.post('/change-password', authenticateSeller, async (req, res) => {
+router.post('/change-password', verifyToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     
