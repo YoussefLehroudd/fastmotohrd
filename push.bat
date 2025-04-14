@@ -1,20 +1,25 @@
 @echo off
-echo Starting Git Push Process...
+echo.
+echo === Git Status ===
+git status
 
-REM Add all changes
-echo Adding all changes...
+echo.
+echo === Staging Changes ===
 git add .
 
-REM Get commit message from user
-set /p commit_msg=Enter your commit message: 
+echo.
+echo === Committing Changes ===
+set /p commit_msg="Enter commit message (or press Enter for default): "
+if "%commit_msg%"=="" (
+    git commit -m "update: project changes"
+) else (
+    git commit -m "%commit_msg%"
+)
 
-REM Commit changes with the provided message
-echo Committing changes...
-git commit -m "%commit_msg%"
-
-REM Push to remote repository
-echo Pushing to remote repository...
+echo.
+echo === Pushing Changes ===
 git push
 
-echo Push process completed!
+echo.
+echo === Operation Complete ===
 pause
