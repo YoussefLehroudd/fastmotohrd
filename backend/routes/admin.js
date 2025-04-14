@@ -39,7 +39,7 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
         COUNT(*) as total,
         SUM(CASE WHEN isAvailableForRent = true THEN 1 ELSE 0 END) as available,
         SUM(CASE WHEN isAvailableForRent = false THEN 1 ELSE 0 END) as rented,
-        AVG(dailyRate) as avgDailyRate
+        CAST(AVG(dailyRate) AS DECIMAL(10,2)) as avgDailyRate
       FROM motors
     `);
     stats.motors = motorStats[0];
@@ -50,7 +50,7 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
         COUNT(*) as total,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
         SUM(CASE WHEN status = 'confirmed' THEN 1 ELSE 0 END) as active,
-        SUM(CASE WHEN status = 'completed' AND DATE(updated_at) = ? THEN 1 ELSE 0 END) as completedToday,
+        SUM(CASE WHEN status = 'completed' AND DATE(created_at) = ? THEN 1 ELSE 0 END) as completedToday,
         SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
       FROM bookings
     `, [today]);
@@ -60,9 +60,9 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
     const [paymentStats] = await db.query(`
       SELECT 
         COUNT(*) as total,
-        SUM(amount) as totalAmount,
-        SUM(CASE WHEN DATE(created_at) = ? THEN amount ELSE 0 END) as todayAmount,
-        AVG(amount) as avgBookingValue,
+        CAST(SUM(amount) AS DECIMAL(10,2)) as totalAmount,
+        CAST(SUM(CASE WHEN DATE(created_at) = ? THEN amount ELSE 0 END) AS DECIMAL(10,2)) as todayAmount,
+        CAST(AVG(amount) AS DECIMAL(10,2)) as avgBookingValue,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
         SUM(CASE WHEN status = 'validated' THEN 1 ELSE 0 END) as validated,
         SUM(CASE WHEN paymentMethod = 'cash_on_delivery' THEN 1 ELSE 0 END) as cashPayments,
@@ -81,13 +81,12 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
     `);
 
     const [recentBookings] = await db.query(`
-      SELECT b.id, b.status, b.created_at,
+      SELECT b.id, b.status, b.created_at, b.totalPrice,
              m.title as motorTitle,
              u.username as userName,
              COALESCE(s.username, 'N/A') as sellerName,
              COALESCE(p.status, 'pending') as paymentStatus,
              COALESCE(p.paymentMethod, 'not_set') as paymentMethod,
-             COALESCE(p.amount, b.totalAmount) as totalAmount,
              p.proofUrl,
              p.validatedAt,
              COALESCE(v.username, 'not_validated') as validatedByUser
@@ -278,14 +277,14 @@ router.get('/bookings', authenticateAdmin, async (req, res) => {
     const offset = (page - 1) * limit;
     
     let query = `
-      SELECT b.*, 
+      SELECT b.id, b.motorId, b.userId, b.startDate, b.endDate, b.status, 
+             b.totalPrice, b.created_at,
              COALESCE(m.title, 'Deleted Motor') as motorTitle, 
              COALESCE(u.username, 'Deleted User') as userName,
              COALESCE(s.username, 'N/A') as sellerName,
              COALESCE(p.status, 'pending') as paymentStatus,
              p.created_at as paymentDate,
              COALESCE(p.paymentMethod, 'not_set') as paymentMethod,
-             COALESCE(p.amount, b.totalAmount) as totalAmount,
              p.proofUrl,
              COALESCE(p.notes, '') as paymentNotes,
              COALESCE(v.username, 'not_validated') as validatedByUser,

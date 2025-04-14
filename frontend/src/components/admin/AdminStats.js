@@ -94,7 +94,7 @@ const AdminStats = ({ stats }) => {
         <Grid item xs={12} sm={6} md={3}>
           <StatCard
             title="Total Revenue"
-            value={`${(payments.totalAmount || 0).toLocaleString()} MAD`}
+            value={`${(Number(payments.totalAmount) || 0).toLocaleString()} MAD`}
             icon={PaymentIcon}
             color="#9c27b0"
           />
@@ -122,7 +122,7 @@ const AdminStats = ({ stats }) => {
               { label: 'Total Motors', value: motors.total || 0 },
               { label: 'Available', value: motors.available || 0 },
               { label: 'Currently Rented', value: motors.rented || 0 },
-              { label: 'Average Daily Rate', value: `${(motors.avgDailyRate || 0).toFixed(2)} MAD` }
+              { label: 'Average Daily Rate', value: `${(Number(motors.avgDailyRate) || 0).toFixed(2)} MAD` }
             ]}
           />
         </Grid>
@@ -133,8 +133,8 @@ const AdminStats = ({ stats }) => {
               { label: 'Pending Bookings', value: bookings.pending || 0 },
               { label: 'Active Bookings', value: bookings.active || 0 },
               { label: 'Completed Today', value: bookings.completedToday || 0 },
-              { label: 'Total Revenue Today', value: `${(payments.todayAmount || 0).toLocaleString()} MAD` },
-              { label: 'Avg. Booking Value', value: `${(payments.avgBookingValue || 0).toFixed(2)} MAD` }
+              { label: 'Total Revenue Today', value: `${(Number(payments.todayAmount) || 0).toLocaleString()} MAD` },
+              { label: 'Avg. Booking Value', value: `${(Number(payments.avgBookingValue) || 0).toFixed(2)} MAD` }
             ]}
           />
         </Grid>
