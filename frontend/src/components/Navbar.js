@@ -47,7 +47,7 @@ const Navbar = () => {
             mx: 'auto'
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/')}>
+          <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => navigate('/home')}>
             <BikeIcon sx={{ mr: 2 }} />
             <Typography variant="h6" component="div">
               FastMoto

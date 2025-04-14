@@ -63,6 +63,7 @@ const SellerReviews = () => {
           }
         }
       };
+      
 
       setReviewsData(transformedData);
     } catch (error) {
@@ -114,6 +115,7 @@ const SellerReviews = () => {
       ? (count / reviewsData.stats.totalReviews) * 100 
       : 0;
   };
+  console.log(reviewsData)
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
@@ -186,7 +188,7 @@ const SellerReviews = () => {
               <Grid item xs>
                 <Box sx={{ mb: 1 }}>
                   <Typography variant="subtitle1" component="span">
-                    {review.customerName}
+                  {review.name}
                   </Typography>
                   <Typography 
                     variant="body2" 
