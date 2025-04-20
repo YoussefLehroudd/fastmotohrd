@@ -257,7 +257,7 @@ router.post('/verify-otp', async (req, res) => {
     res.cookie('token', token, { 
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'Strict' : 'Lax',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }).json({ 
       message: 'Login successful!',

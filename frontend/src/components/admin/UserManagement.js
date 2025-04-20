@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -28,16 +28,36 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 
-const UserManagement = ({ users, pagination, onPageChange, onSearch, onRoleFilter, onUpdateStatus, onUpdateRole }) => {
-  const [page, setPage] = useState(0);
+const UserManagement = ({
+  users,
+  pagination,
+  onPageChange,
+  onSearch,
+  onRoleFilter,
+  onUpdateStatus,
+  onUpdateRole
+}) => {
+  const [page, setPage] = useState(pagination.current ? pagination.current - 1 : 0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [roleFilter, setRoleFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [editUser, setEditUser] = useState(null);
   const [newRole, setNewRole] = useState('');
 
+  useEffect(() => {
+    setPage(pagination.current ? pagination.current - 1 : 0);
+  }, [pagination.current]);
+
   const handlePageChange = (event, newPage) => {
     setPage(newPage);
-    onPageChange(newPage + 1);
+    onPageChange(newPage + 1, rowsPerPage);
+  };
+
+  const handleRowsPerPageChange = (event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setPage(0);
+    onPageChange(1, newRowsPerPage);
   };
 
   const handleSearch = (event) => {
@@ -106,7 +126,7 @@ const UserManagement = ({ users, pagination, onPageChange, onSearch, onRoleFilte
                 <TableCell>{user.username}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
-                  <Chip 
+                  <Chip
                     label={user.role}
                     color={
                       user.role === 'admin' ? 'error' :
@@ -116,7 +136,7 @@ const UserManagement = ({ users, pagination, onPageChange, onSearch, onRoleFilte
                   />
                 </TableCell>
                 <TableCell>
-                  <Chip 
+                  <Chip
                     label={user.isBlocked ? 'Blocked' : 'Active'}
                     color={user.isBlocked ? 'error' : 'success'}
                     size="small"
@@ -155,8 +175,9 @@ const UserManagement = ({ users, pagination, onPageChange, onSearch, onRoleFilte
         count={pagination.total || 0}
         page={page}
         onPageChange={handlePageChange}
-        rowsPerPage={10}
-        rowsPerPageOptions={[10]}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleRowsPerPageChange}
+        rowsPerPageOptions={[5, 10, 25]}
       />
 
       <Dialog open={!!editUser} onClose={() => setEditUser(null)}>

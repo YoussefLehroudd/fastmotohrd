@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Drawer,
   List,
@@ -8,6 +8,7 @@ import {
   Box,
   Typography,
   Divider,
+  IconButton,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -15,13 +16,17 @@ import {
   TwoWheeler as MotorIcon,
   BookOnline as BookingIcon,
   ExitToApp as LogoutIcon,
+  Menu as MenuIcon,
+  ChevronLeft as ChevronLeftIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 
-const drawerWidth = 240;
+const expandedWidth = 240;
+const collapsedWidth = 65;
 
 const AdminNavbar = ({ activeTab, setActiveTab }) => {
+  const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const { logout } = useUser();
 
@@ -41,20 +46,35 @@ const AdminNavbar = ({ activeTab, setActiveTab }) => {
     <Drawer
       variant="permanent"
       sx={{
-        width: drawerWidth,
+        width: open ? expandedWidth : collapsedWidth,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: drawerWidth,
+          width: open ? expandedWidth : collapsedWidth,
           boxSizing: 'border-box',
           backgroundColor: '#1a237e',
           color: 'white',
+          transition: 'width 0.2s',
+          overflowX: 'hidden',
         },
       }}
     >
-      <Box sx={{ p: 2, textAlign: 'center' }}>
-        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-          Admin Dashboard
-        </Typography>
+      <Box sx={{ 
+        p: 2, 
+        display: 'flex', 
+        alignItems: 'center',
+        justifyContent: open ? 'space-between' : 'center'
+      }}>
+        {open && (
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Admin Dashboard
+          </Typography>
+        )}
+        <IconButton
+          onClick={() => setOpen(!open)}
+          sx={{ color: 'white' }}
+        >
+          {open ? <ChevronLeftIcon /> : <MenuIcon />}
+        </IconButton>
       </Box>
       <Divider sx={{ backgroundColor: 'rgba(255,255,255,0.12)' }} />
       <List>
@@ -79,7 +99,7 @@ const AdminNavbar = ({ activeTab, setActiveTab }) => {
             <ListItemIcon sx={{ color: 'white' }}>
               {item.icon}
             </ListItemIcon>
-            <ListItemText primary={item.text} />
+            {open && <ListItemText primary={item.text} />}
           </ListItem>
         ))}
       </List>
@@ -97,7 +117,7 @@ const AdminNavbar = ({ activeTab, setActiveTab }) => {
           <ListItemIcon sx={{ color: 'white' }}>
             <LogoutIcon />
           </ListItemIcon>
-          <ListItemText primary="Logout" />
+          {open && <ListItemText primary="Logout" />}
         </ListItem>
       </List>
     </Drawer>

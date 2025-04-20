@@ -5,10 +5,6 @@ import {
   TwoWheeler as MotorIcon,
   BookOnline as BookingIcon,
   Payment as PaymentIcon,
-  TrendingUp as TrendingUpIcon,
-  Person as PersonIcon,
-  Store as StoreIcon,
-  SupervisorAccount as AdminIcon
 } from '@mui/icons-material';
 
 const StatCard = ({ title, value, icon: Icon, color }) => (
@@ -40,9 +36,13 @@ const DetailCard = ({ title, details }) => (
       <Divider sx={{ my: 1 }} />
       {details.map((detail, index) => (
         <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', my: 1 }}>
-          <Typography variant="body1" color="textSecondary">
-            {detail.label}
-          </Typography>
+          {React.isValidElement(detail.label) ? (
+            detail.label
+          ) : (
+            <Typography variant="body1" color="textSecondary">
+              {detail.label}
+            </Typography>
+          )}
           <Typography variant="body1" fontWeight="bold">
             {detail.value}
           </Typography>
@@ -52,6 +52,18 @@ const DetailCard = ({ title, details }) => (
   </Card>
 );
 
+const BrowserItem = ({ index, browser, sessions }) => {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 1 }}>
+      <Typography sx={{ minWidth: 24 }}>{index}.</Typography>
+      <Typography sx={{ flex: 1 }}>{browser}</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography sx={{ fontWeight: 'bold' }}>{sessions} (sessions)</Typography>
+      </Box>
+    </Box>
+  );
+};
+
 const AdminStats = ({ stats }) => {
   if (!stats) return null;
 
@@ -60,7 +72,8 @@ const AdminStats = ({ stats }) => {
     motors = {},
     bookings = {},
     payments = {},
-    recentActivity = {}
+    topBrowsers = [],
+    topPages = []
   } = stats;
 
   return (
@@ -136,6 +149,37 @@ const AdminStats = ({ stats }) => {
               { label: 'Total Revenue Today', value: `${(Number(payments.todayAmount) || 0).toLocaleString()} MAD` },
               { label: 'Avg. Booking Value', value: `${(Number(payments.avgBookingValue) || 0).toFixed(2)} MAD` }
             ]}
+          />
+        </Grid>
+      </Grid>
+
+      {/* New Stats: Top Browsers and Top Most Visit Pages */}
+      <Grid container spacing={3} sx={{ mt: 3 }}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom color="primary">
+                Top Browsers
+              </Typography>
+              <Divider sx={{ my: 1 }} />
+              {topBrowsers.map((browser, index) => (
+                <BrowserItem 
+                  key={index}
+                  index={index + 1}
+                  browser={browser.browser}
+                  sessions={browser.sessions}
+                />
+              ))}
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <DetailCard
+            title="Top Most Visit Pages"
+            details={topPages.map((page) => ({
+              label: page.url,
+              value: `${page.views} (views)`
+            }))}
           />
         </Grid>
       </Grid>

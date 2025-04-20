@@ -105,6 +105,36 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
       bookings: recentBookings
     };
 
+    // Get top browsers from user_sessions with simplified browser names
+    const [topBrowsers] = await db.query(`
+      SELECT 
+        CASE
+          WHEN browser LIKE '%Chrome%' THEN 'Google Chrome'
+          WHEN browser LIKE '%Firefox%' THEN 'Mozilla Firefox'
+          WHEN browser LIKE '%Safari%' AND browser NOT LIKE '%Chrome%' THEN 'Safari'
+          WHEN browser LIKE '%Edge%' THEN 'Microsoft Edge'
+          WHEN browser LIKE '%Opera%' THEN 'Opera'
+          ELSE 'Other'
+        END as browser,
+        COUNT(*) as sessions
+      FROM user_sessions
+      GROUP BY browser
+      ORDER BY sessions DESC
+      LIMIT 5
+    `);
+
+    // Get top most visited pages from page_views
+    const [topPages] = await db.query(`
+      SELECT page_url as url, COUNT(*) as views
+      FROM page_views
+      GROUP BY page_url
+      ORDER BY views DESC
+      LIMIT 5
+    `);
+
+    stats.topBrowsers = topBrowsers;
+    stats.topPages = topPages;
+
     res.json(stats);
   } catch (error) {
     console.error('Error fetching admin stats:', error);
@@ -215,9 +245,12 @@ router.get('/motors', authenticateAdmin, async (req, res) => {
     const offset = (page - 1) * limit;
     
     let query = `
-      SELECT m.*, u.username as sellerName 
+      SELECT m.*, u.username as sellerName, 
+             COALESCE(l.city, 'N/A') as city,
+             COALESCE(l.address, '') as address
       FROM motors m 
       LEFT JOIN users u ON m.sellerId = u.id 
+      LEFT JOIN motor_locations l ON m.id = l.motorId AND l.isActive = 1
       WHERE 1=1
     `;
     const values = [];
@@ -290,13 +323,16 @@ router.get('/bookings', authenticateAdmin, async (req, res) => {
              COALESCE(v.username, 'not_validated') as validatedByUser,
              p.validatedAt,
              COALESCE(p.stripePaymentIntentId, '') as stripePaymentIntentId,
-             COALESCE(p.stripeChargeId, '') as stripeChargeId
+             COALESCE(p.stripeChargeId, '') as stripeChargeId, 
+             COALESCE(l.city, 'N/A') as city,
+             COALESCE(l.address, '') as address
       FROM bookings b
       LEFT JOIN motors m ON b.motorId = m.id
       LEFT JOIN users u ON b.userId = u.id
       LEFT JOIN users s ON m.sellerId = s.id
       LEFT JOIN payments p ON b.id = p.bookingId
       LEFT JOIN users v ON p.validatedBy = v.id
+      LEFT JOIN motor_locations l ON m.id = l.motorId AND l.isActive = 1
       WHERE 1=1
     `;
     const values = [];

@@ -155,9 +155,25 @@ const authenticateAdmin = async (req, res, next) => {
     });
   }
 };
+const verifyTokenOptional = (req, res, next) => {
+  const token = getTokenFromRequest(req);
+  if (!token) {
+    // No token, proceed without user info
+    return next();
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+  } catch (error) {
+    // Invalid token, ignore and proceed without user info
+  }
+  next();
+};
+
 
 module.exports = {
   verifyToken,
   authenticateSeller,
-  authenticateAdmin
+  authenticateAdmin,
+  verifyTokenOptional
 };

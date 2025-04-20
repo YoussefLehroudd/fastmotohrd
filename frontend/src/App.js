@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Payment from './pages/Payment';
 import PaymentSuccess from './pages/PaymentSuccess';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import { UserProvider } from './context/UserContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -36,6 +36,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <UserProvider>
         <Router>
+          <RouteTracker />
           <Routes>
             <Route path="/signup" element={<Signup />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
@@ -102,6 +103,50 @@ function App() {
       </UserProvider>
     </ThemeProvider>
   );
+}
+
+function RouteTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Send browser info once on mount
+    const sendBrowserInfo = async () => {
+      try {
+        const browser = navigator.userAgentData?.brands?.map(b => b.brand).join(', ') || navigator.userAgent;
+        const userAgent = navigator.userAgent;
+    await fetch('http://localhost:5000/api/tracking/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ browser, userAgent }),
+      credentials: 'include'
+    });
+      } catch (error) {
+        console.error('Failed to send browser info:', error);
+      }
+    };
+
+    sendBrowserInfo();
+  }, []);
+
+  useEffect(() => {
+    // Send page view on route change
+    const sendPageView = async () => {
+      try {
+    await fetch('http://localhost:5000/api/tracking/pageview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: window.location.pathname }),
+      credentials: 'include'
+    });
+      } catch (error) {
+        console.error('Failed to send page view:', error);
+      }
+    };
+
+    sendPageView();
+  }, [location]);
+
+  return null;
 }
 
 export default App;

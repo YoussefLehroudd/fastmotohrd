@@ -31,6 +31,7 @@ const MotorManagement = ({ motors, pagination, onPageChange, onSearch, onStatusF
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  
 
   const handlePageChange = (event, newPage) => {
     setPage(newPage);
@@ -138,14 +139,12 @@ const MotorManagement = ({ motors, pagination, onPageChange, onSearch, onStatusF
                 </TableCell>
                 <TableCell>{motor.sellerName}</TableCell>
                 <TableCell>
-                  {motor.locations?.map(location => (
-                    <Chip 
-                      key={location.id}
-                      label={location.city}
-                      size="small"
-                      sx={{ mr: 0.5, mb: 0.5 }}
-                    />
-                  ))}
+                  <Chip 
+                    label={motor.city || 'N/A'}
+                    size="small"
+                    sx={{ mr: 0.5, mb: 0.5 }}
+                    title={motor.address || ''}
+                  />
                 </TableCell>
               </TableRow>
             ))}

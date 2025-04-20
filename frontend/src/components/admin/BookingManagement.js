@@ -51,6 +51,7 @@ const BookingManagement = ({ bookings, pagination, onPageChange, onSearch, onSta
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [detailsDialog, setDetailsDialog] = useState(false);
 
+
   const handlePageChange = (event, newPage) => {
     setPage(newPage);
     onPageChange(newPage + 1);
@@ -70,6 +71,7 @@ const BookingManagement = ({ bookings, pagination, onPageChange, onSearch, onSta
     setSelectedBooking(booking);
     setDetailsDialog(true);
   };
+
 
   return (
     <Box sx={{ width: '100%' }}>

@@ -95,6 +95,21 @@ const Login = () => {
     setError('');
     setLoading(true);
 
+    async function sendBrowserInfo() {
+      try {
+        const browser = navigator.userAgentData?.brands?.map(b => b.brand).join(', ') || navigator.userAgent;
+        const userAgent = navigator.userAgent;
+        await fetch('/api/tracking/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ browser, userAgent }),
+          credentials: 'include'
+        });
+      } catch (error) {
+        console.error('Failed to send browser info:', error);
+      }
+    }
+
     try {
       if (!showOTPInput) {
         const response = await axios.post('http://localhost:5000/api/auth/login', {
@@ -118,11 +133,14 @@ const Login = () => {
           withCredentials: true
         });
 
+        // Send browser info on successful login
+        await sendBrowserInfo();
+
         // Redirect based on role
         // Store user data in context
         login(response.data.user);
 
-        // Navigate based on role
+        //
         if (response.data.user.role === 'admin') {
           navigate('/admin');
         } else if (response.data.user.role === 'seller') {
