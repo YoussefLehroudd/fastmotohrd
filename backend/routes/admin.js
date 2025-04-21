@@ -144,17 +144,23 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
 
     const [visitorCountries] = await db.query(`
       SELECT 
-        country_name,
-        SUM(visit_count) as visits,
-        (SUM(visit_count) / ${total} * 100) as percentage
-      FROM visitor_countries
-      GROUP BY country_name
+        vc.country_name,
+        SUM(vc.visit_count) as visits,
+        (SUM(vc.visit_count) / ${total} * 100) as percentage,
+        c.flag,
+        c.flag_image
+      FROM visitor_countries vc
+      LEFT JOIN countries c ON CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_general_ci = 
+                             CONVERT(vc.country_name USING utf8mb4) COLLATE utf8mb4_general_ci
+      GROUP BY vc.country_name, c.flag, c.flag_image
       ORDER BY visits DESC
     `);
 
     stats.visitorCountries = visitorCountries.map(stat => ({
       country_name: stat.country_name || 'Unknown',
-      percentage: Number(stat.percentage).toFixed(2)
+      percentage: Number(stat.percentage).toFixed(2),
+      flag: stat.flag || '🏳️',
+      flag_image: stat.flag_image || null
     }));
 
     res.json(stats);

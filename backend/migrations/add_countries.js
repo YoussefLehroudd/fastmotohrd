@@ -6,10 +6,10 @@ async function addCountriesTable() {
     await db.query(`
       CREATE TABLE IF NOT EXISTS countries (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
+        name VARCHAR(100) NOT NULL COLLATE utf8mb4_general_ci,
         code VARCHAR(10) NOT NULL,
         flag VARCHAR(10) NOT NULL
-      )
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
     `);
 
     // Insert countries data

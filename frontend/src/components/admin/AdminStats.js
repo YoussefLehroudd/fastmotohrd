@@ -239,18 +239,20 @@ const AdminStats = ({ stats }) => {
                                   const tooltip = document.createElement('div');
                                   tooltip.id = 'country-tooltip';
                                   tooltip.style.position = 'fixed';
-                                  tooltip.style.backgroundColor = '#0088ff';
+                                  tooltip.style.backgroundColor = 'rgba(0, 136, 255, 0.95)';
                                   tooltip.style.color = 'white';
-                                  tooltip.style.padding = '6px 12px';
-                                  tooltip.style.borderRadius = '4px';
+                                  tooltip.style.padding = '8px 12px';
+                                  tooltip.style.borderRadius = '6px';
                                   tooltip.style.fontSize = '14px';
                                   tooltip.style.fontWeight = '500';
                                   tooltip.style.zIndex = '9999';
                                   tooltip.style.pointerEvents = 'none';
-                                  tooltip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                                  tooltip.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
                                   tooltip.style.whiteSpace = 'nowrap';
+                                  tooltip.style.backdropFilter = 'blur(2px)';
                                   const percentage = stats.visitorCountries.find(c => c.country_name === geo.properties.name)?.percentage;
-                                  tooltip.innerHTML = `${geo.properties.name}: ${percentage}%`;
+                                  const countryData = stats.visitorCountries.find(c => c.country_name === geo.properties.name);
+                                  tooltip.innerHTML = `<img src="${countryData.flag_image}" style="width: 20px; height: 14px; margin-right: 8px; vertical-align: middle; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.2);" /> ${geo.properties.name}: ${percentage}%`;
                                   document.body.appendChild(tooltip);
                                   
                                   function updatePosition(e) {
@@ -294,9 +296,18 @@ const AdminStats = ({ stats }) => {
                       }
                     }}
                   >
-                    <Typography variant="body1" sx={{ color: '#333' }}>
-                      {country.country_name}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ width: 28, height: 20, overflow: 'hidden', borderRadius: 1, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>
+                        <img 
+                          src={country.flag_image} 
+                          alt={country.country_name}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </Box>
+                      <Typography variant="body1" sx={{ color: '#333' }}>
+                        {country.country_name}
+                      </Typography>
+                    </Box>
                     <Typography variant="body1" sx={{ fontWeight: 500, color: '#0088ff' }}>
                       {country.percentage}%
                     </Typography>
