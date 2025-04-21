@@ -72,7 +72,6 @@ const BookingManagement = ({ bookings, pagination, onPageChange, onSearch, onSta
     setDetailsDialog(true);
   };
 
-
   return (
     <Box sx={{ width: '100%' }}>
       <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
@@ -195,7 +194,7 @@ const BookingManagement = ({ bookings, pagination, onPageChange, onSearch, onSta
               <Box>
                 <Typography variant="subtitle1" fontWeight="bold">Motor Details</Typography>
                 <Typography>
-                  {selectedBooking.motorTitle} ({selectedBooking.brand} {selectedBooking.model})
+                  {selectedBooking.motorTitle}
                 </Typography>
               </Box>
 

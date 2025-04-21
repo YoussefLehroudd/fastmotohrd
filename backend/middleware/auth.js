@@ -15,13 +15,13 @@ const getTokenFromRequest = (req) => {
     }
 
     // Log token source for debugging
-    if (token) {
-      console.log('Token found in:', req.cookies?.token ? 'cookies' : 'Authorization header');
-    } else {
-      console.log('No token found in request');
-      console.log('Cookies:', req.cookies);
-      console.log('Headers:', req.headers);
-    }
+    // if (token) {
+    //   console.log('Token found in:', req.cookies?.token ? 'cookies' : 'Authorization header');
+    // } else {
+    //   console.log('No token found in request');
+    //   console.log('Cookies:', req.cookies);
+    //   console.log('Headers:', req.headers);
+    // }
     
     return token;
   } catch (error) {
@@ -71,7 +71,7 @@ const authenticateAdmin = async (req, res, next) => {
     const token = getTokenFromRequest(req);
     
     if (!token) {
-      console.log('Admin authentication failed: No token provided');
+      // console.log('Admin authentication failed: No token provided');
       return res.status(401).json({ 
         message: 'Authentication required',
         error: 'No token provided'
@@ -80,7 +80,7 @@ const authenticateAdmin = async (req, res, next) => {
 
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log('Token decoded:', { userId: decoded.id, role: decoded.role });
+      // console.log('Token decoded:', { userId: decoded.id, role: decoded.role });
       
       if (decoded.role !== 'admin') {
         console.log('Admin authentication failed: User is not an admin');
@@ -126,10 +126,10 @@ const authenticateAdmin = async (req, res, next) => {
           });
         }
 
-        console.log('Google-authenticated admin verified:', {
-          email: user[0].email,
-          isVerified: user[0].isVerified
-        });
+        // console.log('Google-authenticated admin verified:', {
+        //   email: user[0].email,
+        //   isVerified: user[0].isVerified
+        // });
       }
 
       // Update last activity timestamp
