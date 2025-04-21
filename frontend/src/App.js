@@ -109,35 +109,48 @@ function RouteTracker() {
   const location = useLocation();
 
   useEffect(() => {
-    // Send browser info once on mount
-    const sendBrowserInfo = async () => {
-      try {
-        const browser = navigator.userAgentData?.brands?.map(b => b.brand).join(', ') || navigator.userAgent;
-        const userAgent = navigator.userAgent;
-    await fetch('http://localhost:5000/api/tracking/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ browser, userAgent }),
-      credentials: 'include'
-    });
-      } catch (error) {
-        console.error('Failed to send browser info:', error);
-      }
-    };
+    // Load axios script
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/axios@1.6.7/dist/axios.min.js';
+    script.async = true;
+    document.body.appendChild(script);
 
-    sendBrowserInfo();
+    script.onload = () => {
+      // Get IP address
+      // @ts-ignore
+      window.axios.get('https://api.ipify.org?format=json')
+        .then(response => {
+          const ip = response.data.ip;
+          // console.log('IP Address:', ip);
+          
+          const browser = navigator.userAgentData?.brands?.map(b => b.brand).join(', ') || navigator.userAgent;
+          const userAgent = navigator.userAgent;
+
+          // Send browser info with IP
+          fetch('http://localhost:5000/api/tracking/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              browser, 
+              userAgent,
+              ip
+            }),
+            credentials: 'include'
+          });
+        });
+    };
   }, []);
 
   useEffect(() => {
     // Send page view on route change
     const sendPageView = async () => {
       try {
-    await fetch('http://localhost:5000/api/tracking/pageview', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: window.location.pathname }),
-      credentials: 'include'
-    });
+        await fetch('http://localhost:5000/api/tracking/pageview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: window.location.pathname }),
+          credentials: 'include'
+        });
       } catch (error) {
         console.error('Failed to send page view:', error);
       }

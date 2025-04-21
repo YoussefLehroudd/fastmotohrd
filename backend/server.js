@@ -866,6 +866,22 @@ const startServer = async () => {
     db = await initializeDatabase();
     console.log('Database initialized successfully');
 
+    // Log all IP-related information
+    app.use((req, res, next) => {
+      try {
+        console.log('=== IP ADDRESS INFORMATION ===');
+        console.log('x-forwarded-for:', req.headers['x-forwarded-for']);
+        console.log('x-real-ip:', req.headers['x-real-ip']);
+        console.log('x-client-ip:', req.headers['x-client-ip']);
+        console.log('remoteAddress:', req.connection.remoteAddress);
+        console.log('socket remoteAddress:', req.socket.remoteAddress);
+        console.log('=== END IP INFO ===');
+      } catch (error) {
+        console.error('Error tracking visitor country:', error);
+      }
+      next();
+    });
+
     const tryPort = async (port) => {
       try {
         await new Promise((resolve, reject) => {
