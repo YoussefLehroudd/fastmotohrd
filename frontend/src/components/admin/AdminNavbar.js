@@ -18,8 +18,9 @@ import {
   ExitToApp as LogoutIcon,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
+  Chat as ChatIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
 
 const expandedWidth = 240;
@@ -28,6 +29,7 @@ const collapsedWidth = 65;
 const AdminNavbar = ({ activeTab, setActiveTab }) => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useUser();
 
   const menuItems = [
@@ -35,6 +37,7 @@ const AdminNavbar = ({ activeTab, setActiveTab }) => {
     { text: 'Users', icon: <PeopleIcon />, index: 1 },
     { text: 'Motors', icon: <MotorIcon />, index: 2 },
     { text: 'Bookings', icon: <BookingIcon />, index: 3 },
+    { text: 'Chat', icon: <ChatIcon />, path: '/admin/chat' },
   ];
 
   const handleLogout = async () => {
@@ -82,8 +85,8 @@ const AdminNavbar = ({ activeTab, setActiveTab }) => {
           <ListItem
             button
             key={item.text}
-            onClick={() => setActiveTab(item.index)}
-            selected={activeTab === item.index}
+            onClick={() => item.path ? navigate(item.path) : setActiveTab(item.index)}
+            selected={item.path ? location.pathname === item.path : activeTab === item.index}
             sx={{
               '&.Mui-selected': {
                 backgroundColor: 'rgba(255,255,255,0.1)',

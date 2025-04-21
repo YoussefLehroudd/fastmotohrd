@@ -9,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
-const WebSocket = require('ws');
+const socketIo = require('socket.io');
 
 // Configure multer for handling file uploads
 const storage = multer.diskStorage({
@@ -801,8 +801,12 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
+// Initialize socket service
+const { initializeSocket } = require('./utils/socketService');
+
 // Register all routes
 const authRoutes = require('./routes/auth');
+const chatRoutes = require('./routes/chat');
 const countriesRoutes = require('./routes/countries');
 const sellerRoutes = require('./routes/seller');
 const userRoutes = require('./routes/users');
@@ -812,6 +816,7 @@ const reviewsRoutes = require('./routes/reviews_updated');
 const paymentsRoutes = require('./routes/payments');
 
 app.use('/api/auth', authRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/countries', countriesRoutes);
 app.use('/api/stripe', require('./routes/stripe'));
 app.use('/api/bookings', bookingsRoutes);
@@ -895,35 +900,16 @@ const startServer = async () => {
               }
             })
             .once('listening', () => {
-              // Set up WebSocket server
-              const wss = new WebSocket.Server({ server });
-              
-              // Store connected clients
-              const clients = new Map();
-
-              wss.on('connection', (ws, req) => {
-                const token = req.url.split('=')[1];
-                if (!token) {
-                  ws.close();
-                  return;
-                }
-
-                try {
-                  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                  const userId = decoded.id;
-                  clients.set(userId, ws);
-
-                  ws.on('close', () => {
-                    clients.delete(userId);
-                  });
-                } catch (err) {
-                  ws.close();
+              // Initialize Socket.IO
+              const io = socketIo(server, {
+                cors: {
+                  origin: "http://localhost:3000",
+                  methods: ["GET", "POST"],
+                  credentials: true,
+                  allowedHeaders: ["Content-Type", "Authorization", "Cookie"]
                 }
               });
-
-              // Add WebSocket server to app for use in routes
-              app.set('wss', wss);
-              app.set('wsClients', clients);
+              initializeSocket(io);
 
               console.log(`Server running on http://localhost:${port}`);
               resolve(true);

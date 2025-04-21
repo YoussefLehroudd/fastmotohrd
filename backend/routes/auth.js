@@ -153,9 +153,10 @@ router.post('/google', async (req, res) => {
     );
 
     res.cookie('token', jwtToken, {
-      httpOnly: true,
+      httpOnly: false, // Allow JavaScript access for Socket.IO
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'Lax',
+      path: '/',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }).json({
       message: 'Google authentication successful',
@@ -255,9 +256,10 @@ router.post('/verify-otp', async (req, res) => {
     otpStore.delete(email);
 
     res.cookie('token', token, { 
-      httpOnly: true,
+      httpOnly: false, // Allow JavaScript access for Socket.IO
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'Strict' : 'Lax',
+      sameSite: 'Lax',
+      path: '/',
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }).json({ 
       message: 'Login successful!',
@@ -317,9 +319,10 @@ router.post('/resend-otp', async (req, res) => {
 // Logout
 router.post('/logout', (req, res) => {
   res.clearCookie('token', {
-    httpOnly: true,
+    httpOnly: false,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Strict'
+    sameSite: 'Lax',
+    path: '/'
   }).json({ message: 'Logged out' });
 });
 

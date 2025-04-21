@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 14, 2025 at 02:46 PM
+-- Generation Time: Apr 21, 2025 at 11:14 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -56,7 +56,41 @@ CREATE TABLE `bookings` (
 
 INSERT INTO `bookings` (`id`, `motorId`, `userId`, `startDate`, `endDate`, `pickupTime`, `returnTime`, `location`, `status`, `totalPrice`, `depositAmount`, `specialRequests`, `mileageStart`, `mileageEnd`, `fuelLevelStart`, `fuelLevelEnd`, `damageNotes`, `cancellationReason`, `created_at`, `locationId`) VALUES
 (54, 2, 8, '2025-04-12', '2025-04-13', '09:00:00', '09:00:00', 'laayoune, hey el massira', 'confirmed', 150.00, NULL, '', NULL, NULL, NULL, NULL, NULL, NULL, '2025-04-12 07:50:58', NULL),
-(55, 2, 8, '2025-04-14', '2025-04-16', '10:00:00', '09:00:00', 'laayoune, hey el massira', 'confirmed', 300.00, NULL, '', NULL, NULL, NULL, NULL, NULL, NULL, '2025-04-14 10:32:40', NULL);
+(55, 2, 8, '2025-04-14', '2025-04-16', '10:00:00', '09:00:00', 'laayoune, hey el massira', 'confirmed', 300.00, NULL, '', NULL, NULL, NULL, NULL, NULL, NULL, '2025-04-14 10:32:40', NULL),
+(56, 3, 8, '2025-04-15', '2025-04-18', '11:00:00', '11:00:00', 'casablanca, rue soltane', 'confirmed', 300.00, NULL, '', NULL, NULL, NULL, NULL, NULL, NULL, '2025-04-15 14:33:17', NULL),
+(57, 2, 8, '2025-04-18', '2025-04-19', '08:00:00', '10:00:00', 'laayoune, hey el massira', 'pending', 150.00, NULL, '', NULL, NULL, NULL, NULL, NULL, NULL, '2025-04-18 21:59:26', NULL),
+(58, 2, 8, '2025-04-21', '2025-04-22', '07:00:00', '08:00:00', 'laayoune, hey el massira', 'confirmed', 150.00, NULL, 'bghit nji l9a motor n9i', NULL, NULL, NULL, NULL, NULL, NULL, '2025-04-21 10:43:35', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `chat_messages`
+--
+
+CREATE TABLE `chat_messages` (
+  `id` int(11) NOT NULL,
+  `room_id` int(11) NOT NULL,
+  `sender_id` int(11) NOT NULL,
+  `sender_type` enum('user','seller','admin') NOT NULL,
+  `message` text NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_read` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `chat_rooms`
+--
+
+CREATE TABLE `chat_rooms` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `user_type` enum('user','seller') NOT NULL,
+  `status` enum('active','closed') DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -456,12 +490,9 @@ CREATE TABLE `notifications` (
 --
 
 INSERT INTO `notifications` (`id`, `userId`, `content`, `isRead`, `type`, `priority`, `actionUrl`, `created_at`) VALUES
-(449, 9, 'New booking request for Yamaha R1', 0, 'booking', 'high', '/bookings/48', '2025-04-11 16:53:37'),
-(450, 9, 'New booking request for Yamaha R1', 0, 'booking', 'high', '/bookings/49', '2025-04-11 16:56:57'),
-(463, 9, 'New booking request for Yamaha R1', 0, 'booking', 'high', '/bookings/54', '2025-04-12 07:50:58'),
-(466, 9, 'New booking request for Yamaha R1', 0, 'booking', 'high', '/bookings/55', '2025-04-14 10:32:40'),
-(467, 8, 'Your booking for Yamaha R1 has been confirmed', 0, 'booking', 'high', '/bookings/55', '2025-04-14 10:35:11'),
-(468, 8, 'Your payment for Yamaha R1 has been validated', 0, 'payment', 'high', '/bookings/55', '2025-04-14 10:36:11');
+(469, 9, 'New booking request for Honda CBR500R', 0, 'booking', 'high', '/bookings/56', '2025-04-15 14:33:17'),
+(472, 9, 'New booking request for Yamaha R1', 0, 'booking', 'high', '/bookings/57', '2025-04-18 21:59:26'),
+(473, 9, 'New booking request for Yamaha R1', 0, 'booking', 'high', '/bookings/58', '2025-04-21 10:43:35');
 
 -- --------------------------------------------------------
 
@@ -477,6 +508,424 @@ CREATE TABLE `orders` (
   `status` enum('pending','confirmed','cancelled') DEFAULT 'pending',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `page_views`
+--
+
+CREATE TABLE `page_views` (
+  `id` int(11) NOT NULL,
+  `userId` int(11) DEFAULT NULL,
+  `page_url` varchar(2048) NOT NULL,
+  `viewedAt` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `page_views`
+--
+
+INSERT INTO `page_views` (`id`, `userId`, `page_url`, `viewedAt`) VALUES
+(393, 8, '/login', '2025-04-21 12:12:07'),
+(394, 8, '/login', '2025-04-21 12:16:02'),
+(395, 8, '/', '2025-04-21 12:16:02'),
+(396, 10, '/admin', '2025-04-21 12:16:38'),
+(397, 10, '/admin', '2025-04-21 12:17:36'),
+(398, 10, '/admin', '2025-04-21 12:17:36'),
+(399, 10, '/admin', '2025-04-21 12:19:03'),
+(400, 10, '/admin', '2025-04-21 12:19:26'),
+(401, 10, '/admin', '2025-04-21 12:19:26'),
+(402, 10, '/admin', '2025-04-21 12:19:44'),
+(403, 10, '/admin', '2025-04-21 12:19:44'),
+(404, 10, '/', '2025-04-21 16:18:34'),
+(405, 10, '/login', '2025-04-21 16:18:34'),
+(406, 10, '/admin', '2025-04-21 16:19:47'),
+(407, 10, '/admin', '2025-04-21 16:25:26'),
+(408, 10, '/admin', '2025-04-21 16:25:26'),
+(409, 10, '/admin', '2025-04-21 16:26:10'),
+(410, 10, '/admin', '2025-04-21 16:26:10'),
+(411, 10, '/admin', '2025-04-21 16:26:22'),
+(412, 10, '/admin', '2025-04-21 16:26:22'),
+(413, 10, '/admin', '2025-04-21 16:26:32'),
+(414, 10, '/admin', '2025-04-21 16:26:32'),
+(415, 10, '/admin', '2025-04-21 16:26:34'),
+(416, 10, '/admin', '2025-04-21 16:26:34'),
+(417, 10, '/admin', '2025-04-21 16:27:14'),
+(418, 10, '/admin', '2025-04-21 16:27:14'),
+(419, 10, '/admin', '2025-04-21 16:27:27'),
+(420, 10, '/admin', '2025-04-21 16:27:27'),
+(421, 10, '/admin', '2025-04-21 16:29:28'),
+(422, 10, '/admin', '2025-04-21 16:29:28'),
+(423, 10, '/admin', '2025-04-21 16:29:48'),
+(424, 10, '/admin', '2025-04-21 16:29:48'),
+(425, 10, '/admin', '2025-04-21 16:31:24'),
+(426, 10, '/admin', '2025-04-21 16:31:24'),
+(427, 10, '/admin', '2025-04-21 16:31:26'),
+(428, 10, '/admin', '2025-04-21 16:34:46'),
+(429, 10, '/admin', '2025-04-21 16:34:46'),
+(430, 10, '/admin', '2025-04-21 16:34:54'),
+(431, 10, '/admin', '2025-04-21 16:34:54'),
+(432, 10, '/admin', '2025-04-21 16:38:38'),
+(433, 10, '/admin', '2025-04-21 16:38:38'),
+(434, 10, '/admin', '2025-04-21 16:43:16'),
+(435, 10, '/admin', '2025-04-21 16:43:16'),
+(436, 10, '/admin', '2025-04-21 16:43:38'),
+(437, 10, '/admin', '2025-04-21 16:43:38'),
+(438, 10, '/admin', '2025-04-21 16:44:05'),
+(439, 10, '/admin', '2025-04-21 16:44:05'),
+(440, 10, '/admin', '2025-04-21 16:44:20'),
+(441, 10, '/admin', '2025-04-21 16:44:20'),
+(442, 10, '/admin', '2025-04-21 16:44:36'),
+(443, 10, '/admin', '2025-04-21 16:44:36'),
+(444, 10, '/admin', '2025-04-21 16:47:21'),
+(445, 10, '/admin', '2025-04-21 16:47:21'),
+(446, 10, '/admin', '2025-04-21 16:47:48'),
+(447, 10, '/admin', '2025-04-21 16:47:48'),
+(448, 10, '/admin', '2025-04-21 16:49:33'),
+(449, 10, '/admin', '2025-04-21 16:49:33'),
+(450, 10, '/admin', '2025-04-21 16:50:25'),
+(451, 10, '/admin', '2025-04-21 16:50:25'),
+(452, 10, '/admin', '2025-04-21 16:51:09'),
+(453, 10, '/admin', '2025-04-21 16:51:09'),
+(454, 10, '/admin', '2025-04-21 16:51:19'),
+(455, 10, '/admin', '2025-04-21 16:51:19'),
+(456, 10, '/admin', '2025-04-21 16:51:23'),
+(457, 10, '/admin', '2025-04-21 16:51:23'),
+(458, NULL, '/', '2025-04-21 16:59:03'),
+(459, NULL, '/login', '2025-04-21 16:59:03'),
+(460, NULL, '/login', '2025-04-21 16:59:03'),
+(461, 10, '/admin', '2025-04-21 16:59:08'),
+(462, 10, '/admin', '2025-04-21 16:59:08'),
+(463, 10, '/admin', '2025-04-21 17:01:20'),
+(464, 10, '/admin', '2025-04-21 17:01:20'),
+(465, NULL, '/admin', '2025-04-21 17:01:33'),
+(466, NULL, '/admin', '2025-04-21 17:01:33'),
+(467, NULL, '/login', '2025-04-21 17:01:33'),
+(468, 10, '/admin', '2025-04-21 17:01:37'),
+(469, 10, '/admin', '2025-04-21 17:01:37'),
+(470, 10, '/admin', '2025-04-21 17:02:22'),
+(471, 10, '/admin', '2025-04-21 17:02:22'),
+(472, 10, '/admin', '2025-04-21 17:05:10'),
+(473, 10, '/admin', '2025-04-21 17:05:10'),
+(474, 10, '/admin', '2025-04-21 17:05:15'),
+(475, 10, '/admin', '2025-04-21 17:06:38'),
+(476, 10, '/admin', '2025-04-21 17:06:38'),
+(477, 10, '/admin', '2025-04-21 17:06:41'),
+(478, 10, '/admin', '2025-04-21 17:06:41'),
+(479, NULL, '/', '2025-04-21 17:06:46'),
+(480, NULL, '/login', '2025-04-21 17:06:46'),
+(481, NULL, '/login', '2025-04-21 17:06:46'),
+(482, NULL, '/login', '2025-04-21 17:06:53'),
+(483, NULL, '/login', '2025-04-21 17:06:53'),
+(484, 10, '/admin', '2025-04-21 17:07:00'),
+(485, 10, '/admin', '2025-04-21 17:07:02'),
+(486, 10, '/admin', '2025-04-21 17:07:02'),
+(487, NULL, '/login', '2025-04-21 17:07:06'),
+(488, NULL, '/login', '2025-04-21 17:07:06'),
+(489, NULL, '/login', '2025-04-21 17:07:08'),
+(490, NULL, '/login', '2025-04-21 17:07:08'),
+(491, 10, '/admin', '2025-04-21 17:07:11'),
+(492, 10, '/admin', '2025-04-21 17:07:11'),
+(493, NULL, '/login', '2025-04-21 17:07:28'),
+(494, NULL, '/login', '2025-04-21 17:07:28'),
+(495, NULL, '/login', '2025-04-21 17:07:43'),
+(496, NULL, '/login', '2025-04-21 17:07:43'),
+(497, NULL, '/', '2025-04-21 17:07:52'),
+(498, NULL, '/login', '2025-04-21 17:07:52'),
+(499, NULL, '/login', '2025-04-21 17:07:52'),
+(500, NULL, '/login', '2025-04-21 17:10:16'),
+(501, NULL, '/login', '2025-04-21 17:10:16'),
+(502, NULL, '/login', '2025-04-21 17:10:58'),
+(503, NULL, '/login', '2025-04-21 17:10:58'),
+(504, NULL, '/login', '2025-04-21 17:11:10'),
+(505, NULL, '/login', '2025-04-21 17:11:10'),
+(506, 10, '/admin', '2025-04-21 17:11:17'),
+(507, 10, '/admin', '2025-04-21 17:11:17'),
+(508, 10, '/admin', '2025-04-21 17:11:22'),
+(509, 10, '/admin', '2025-04-21 17:27:54'),
+(510, 10, '/admin', '2025-04-21 17:27:54'),
+(511, 10, '/admin', '2025-04-21 17:28:40'),
+(512, 10, '/admin', '2025-04-21 17:28:40'),
+(513, 10, '/admin', '2025-04-21 17:29:59'),
+(514, 10, '/admin', '2025-04-21 17:29:59'),
+(515, NULL, '/login', '2025-04-21 17:30:03'),
+(516, NULL, '/login', '2025-04-21 17:30:03'),
+(517, NULL, '/login', '2025-04-21 17:30:08'),
+(518, NULL, '/login', '2025-04-21 17:30:08'),
+(519, 10, '/admin', '2025-04-21 17:30:51'),
+(520, 10, '/admin', '2025-04-21 17:30:51'),
+(521, 10, '/admin', '2025-04-21 17:31:41'),
+(522, 10, '/admin', '2025-04-21 17:31:41'),
+(523, 10, '/admin', '2025-04-21 17:31:49'),
+(524, 10, '/admin', '2025-04-21 17:31:49'),
+(525, 10, '/admin', '2025-04-21 17:31:53'),
+(526, 10, '/admin', '2025-04-21 17:31:53'),
+(527, 10, '/admin', '2025-04-21 17:33:08'),
+(528, 10, '/admin', '2025-04-21 17:33:08'),
+(529, 10, '/admin', '2025-04-21 17:34:26'),
+(530, 10, '/admin', '2025-04-21 17:34:26'),
+(531, 10, '/admin', '2025-04-21 17:36:28'),
+(532, 10, '/admin', '2025-04-21 17:36:28'),
+(533, 10, '/admin', '2025-04-21 17:36:34'),
+(534, 10, '/admin', '2025-04-21 17:36:34'),
+(535, 10, '/admin', '2025-04-21 17:36:57'),
+(536, 10, '/admin', '2025-04-21 17:36:57'),
+(537, NULL, '/login', '2025-04-21 17:37:25'),
+(538, NULL, '/login', '2025-04-21 17:37:25'),
+(539, 10, '/admin', '2025-04-21 17:37:32'),
+(540, 10, '/admin', '2025-04-21 17:37:32'),
+(541, 10, '/admin', '2025-04-21 17:37:34'),
+(542, 10, '/admin', '2025-04-21 17:37:34'),
+(543, 10, '/admin', '2025-04-21 17:38:12'),
+(544, 10, '/admin', '2025-04-21 17:38:12'),
+(545, 10, '/admin', '2025-04-21 17:38:35'),
+(546, 10, '/admin', '2025-04-21 17:38:35'),
+(547, 10, '/admin', '2025-04-21 17:38:39'),
+(548, 10, '/admin', '2025-04-21 17:38:39'),
+(549, 10, '/admin', '2025-04-21 17:38:57'),
+(550, 10, '/admin', '2025-04-21 17:38:57'),
+(551, 10, '/admin', '2025-04-21 17:40:44'),
+(552, 10, '/admin', '2025-04-21 17:40:44'),
+(553, 10, '/admin', '2025-04-21 17:41:30'),
+(554, NULL, '/login', '2025-04-21 17:41:32'),
+(555, NULL, '/login', '2025-04-21 17:41:32'),
+(556, 10, '/admin', '2025-04-21 17:41:36'),
+(557, 10, '/admin', '2025-04-21 17:41:36'),
+(558, 10, '/admin', '2025-04-21 17:43:25'),
+(559, 10, '/admin', '2025-04-21 17:43:25'),
+(560, 10, '/admin', '2025-04-21 17:56:04'),
+(561, 10, '/admin', '2025-04-21 17:56:04'),
+(562, 10, '/admin', '2025-04-21 17:56:07'),
+(563, 10, '/admin', '2025-04-21 17:57:05'),
+(564, 10, '/admin', '2025-04-21 17:57:05'),
+(565, 10, '/admin', '2025-04-21 17:57:15'),
+(566, 10, '/admin', '2025-04-21 17:57:15'),
+(567, 10, '/admin', '2025-04-21 17:58:07'),
+(568, 10, '/admin', '2025-04-21 17:58:07'),
+(569, 10, '/admin', '2025-04-21 18:00:09'),
+(570, 10, '/admin', '2025-04-21 18:00:09'),
+(571, 10, '/admin', '2025-04-21 18:00:38'),
+(572, 10, '/admin', '2025-04-21 18:00:38'),
+(573, 10, '/admin', '2025-04-21 18:00:59'),
+(574, 10, '/admin', '2025-04-21 18:00:59'),
+(575, 10, '/admin', '2025-04-21 18:01:08'),
+(576, 10, '/admin', '2025-04-21 18:01:08'),
+(577, 10, '/admin', '2025-04-21 18:01:29'),
+(578, 10, '/admin', '2025-04-21 18:01:29'),
+(579, 10, '/admin', '2025-04-21 18:01:37'),
+(580, 10, '/admin', '2025-04-21 18:01:37'),
+(581, 10, '/admin', '2025-04-21 18:02:15'),
+(582, 10, '/admin', '2025-04-21 18:02:15'),
+(583, 10, '/admin', '2025-04-21 18:02:32'),
+(584, 10, '/admin', '2025-04-21 18:02:32'),
+(585, 10, '/admin', '2025-04-21 18:02:57'),
+(586, 10, '/admin', '2025-04-21 18:02:57'),
+(587, NULL, '/login', '2025-04-21 18:05:25'),
+(588, NULL, '/login', '2025-04-21 18:05:25'),
+(589, 10, '/admin', '2025-04-21 18:05:27'),
+(590, 10, '/admin', '2025-04-21 18:05:27'),
+(591, NULL, '/login', '2025-04-21 18:05:55'),
+(592, NULL, '/login', '2025-04-21 18:05:55'),
+(593, 10, '/admin', '2025-04-21 18:06:12'),
+(594, 10, '/admin', '2025-04-21 18:06:12'),
+(595, 10, '/admin', '2025-04-21 18:06:15'),
+(596, 10, '/admin', '2025-04-21 18:06:15'),
+(597, 10, '/admin', '2025-04-21 18:06:43'),
+(598, 10, '/admin', '2025-04-21 18:06:43'),
+(599, 10, '/admin', '2025-04-21 18:07:07'),
+(600, 10, '/admin', '2025-04-21 18:07:07'),
+(601, NULL, '/login', '2025-04-21 18:08:39'),
+(602, NULL, '/login', '2025-04-21 18:08:39'),
+(603, 10, '/admin', '2025-04-21 18:08:42'),
+(604, 10, '/admin', '2025-04-21 18:08:42'),
+(605, NULL, '/login', '2025-04-21 18:09:07'),
+(606, NULL, '/login', '2025-04-21 18:09:07'),
+(607, 10, '/admin', '2025-04-21 18:09:08'),
+(608, 10, '/admin', '2025-04-21 18:09:08'),
+(609, NULL, '/login', '2025-04-21 18:09:43'),
+(610, NULL, '/login', '2025-04-21 18:09:43'),
+(611, 10, '/admin', '2025-04-21 18:10:33'),
+(612, 10, '/admin', '2025-04-21 18:10:33'),
+(613, 10, '/admin', '2025-04-21 18:10:35'),
+(614, 10, '/admin', '2025-04-21 18:10:35'),
+(615, NULL, '/login', '2025-04-21 18:10:39'),
+(616, NULL, '/login', '2025-04-21 18:10:39'),
+(617, NULL, '/login', '2025-04-21 18:10:43'),
+(618, NULL, '/login', '2025-04-21 18:10:43'),
+(619, 10, '/admin', '2025-04-21 18:10:44'),
+(620, 10, '/admin', '2025-04-21 18:10:44'),
+(621, 10, '/admin', '2025-04-21 18:10:58'),
+(622, 10, '/admin', '2025-04-21 18:10:58'),
+(623, 10, '/admin', '2025-04-21 18:11:04'),
+(624, 10, '/admin', '2025-04-21 18:11:04'),
+(625, NULL, '/login', '2025-04-21 18:11:49'),
+(626, NULL, '/login', '2025-04-21 18:11:49'),
+(627, 10, '/admin', '2025-04-21 18:11:54'),
+(628, 10, '/admin', '2025-04-21 18:11:54'),
+(629, 10, '/login', '2025-04-21 20:20:46'),
+(630, 10, '/', '2025-04-21 20:20:46'),
+(631, 8, '/home', '2025-04-21 20:20:59'),
+(632, 8, '/motor/2', '2025-04-21 20:21:46'),
+(633, 8, '/home', '2025-04-21 20:29:08'),
+(634, 8, '/home', '2025-04-21 20:29:08'),
+(635, 8, '/home', '2025-04-21 20:29:39'),
+(636, 8, '/home', '2025-04-21 20:30:31'),
+(637, 8, '/home', '2025-04-21 20:30:31'),
+(638, 8, '/home', '2025-04-21 20:30:48'),
+(639, 8, '/home', '2025-04-21 20:30:48'),
+(640, 8, '/home', '2025-04-21 20:31:06'),
+(641, 8, '/home', '2025-04-21 20:31:06'),
+(642, 8, '/home', '2025-04-21 20:31:16'),
+(643, 8, '/home', '2025-04-21 20:31:16'),
+(644, 8, '/home', '2025-04-21 20:31:56'),
+(645, 8, '/home', '2025-04-21 20:31:56'),
+(646, 8, '/home', '2025-04-21 20:32:14'),
+(647, 8, '/home', '2025-04-21 20:32:14'),
+(648, 8, '/home', '2025-04-21 20:32:29'),
+(649, 8, '/home', '2025-04-21 20:32:29'),
+(650, 8, '/home', '2025-04-21 20:32:44'),
+(651, 8, '/home', '2025-04-21 20:33:08'),
+(652, 8, '/home', '2025-04-21 20:33:08'),
+(653, 8, '/profile', '2025-04-21 20:33:35'),
+(654, 8, '/profile', '2025-04-21 20:33:42'),
+(655, 8, '/profile', '2025-04-21 20:33:42'),
+(656, NULL, '/login', '2025-04-21 20:34:17'),
+(657, NULL, '/login', '2025-04-21 20:34:18'),
+(658, NULL, '/login', '2025-04-21 20:34:18'),
+(659, 8, '/home', '2025-04-21 20:34:23'),
+(660, 8, '/home', '2025-04-21 20:34:47'),
+(661, 8, '/home', '2025-04-21 20:34:47'),
+(662, 8, '/home', '2025-04-21 20:35:24'),
+(663, 8, '/home', '2025-04-21 20:35:24'),
+(664, 8, '/home', '2025-04-21 20:35:51'),
+(665, 8, '/home', '2025-04-21 20:35:59'),
+(666, 8, '/home', '2025-04-21 20:35:59'),
+(667, NULL, '/login', '2025-04-21 20:36:07'),
+(668, 10, '/admin', '2025-04-21 20:36:11'),
+(669, 10, '/admin/chat', '2025-04-21 20:37:23'),
+(670, 10, '/admin', '2025-04-21 20:37:35'),
+(671, 10, '/admin/chat', '2025-04-21 20:37:36'),
+(672, 10, '/admin', '2025-04-21 20:37:37'),
+(673, 10, '/admin/chat', '2025-04-21 20:37:39'),
+(674, 10, '/admin', '2025-04-21 20:37:57'),
+(675, 10, '/admin/chat', '2025-04-21 20:38:01'),
+(676, 10, '/admin', '2025-04-21 20:38:03'),
+(677, 10, '/admin/chat', '2025-04-21 20:38:07'),
+(678, 10, '/admin', '2025-04-21 20:38:14'),
+(679, 10, '/login', '2025-04-21 20:39:01'),
+(680, 10, '/', '2025-04-21 20:39:01'),
+(681, 8, '/home', '2025-04-21 20:39:05'),
+(682, 8, '/home', '2025-04-21 20:39:17'),
+(683, 8, '/home', '2025-04-21 20:39:17'),
+(684, 8, '/profile', '2025-04-21 20:40:15'),
+(685, 8, '/home', '2025-04-21 20:40:22'),
+(686, 8, '/home', '2025-04-21 20:40:35'),
+(687, 8, '/home', '2025-04-21 20:40:35'),
+(688, 8, '/home', '2025-04-21 20:40:54'),
+(689, 8, '/home', '2025-04-21 20:40:54'),
+(690, NULL, '/login', '2025-04-21 20:41:10'),
+(691, NULL, '/login', '2025-04-21 20:41:12'),
+(692, NULL, '/login', '2025-04-21 20:41:12'),
+(693, 8, '/home', '2025-04-21 20:41:29'),
+(694, 8, '/home', '2025-04-21 20:41:46'),
+(695, NULL, '/login', '2025-04-21 20:42:30'),
+(696, 8, '/home', '2025-04-21 20:42:34'),
+(697, 8, '/profile', '2025-04-21 20:42:37'),
+(698, 8, '/profile', '2025-04-21 20:42:44'),
+(699, 8, '/profile', '2025-04-21 20:42:44'),
+(700, 8, '/profile', '2025-04-21 20:42:48'),
+(701, 8, '/home', '2025-04-21 20:42:53'),
+(702, 8, '/home', '2025-04-21 20:43:06'),
+(703, 8, '/home', '2025-04-21 20:43:06'),
+(704, NULL, '/login', '2025-04-21 20:43:07'),
+(705, 8, '/home', '2025-04-21 20:43:12'),
+(706, 8, '/home', '2025-04-21 20:43:55'),
+(707, 8, '/home', '2025-04-21 20:43:55'),
+(708, NULL, '/login', '2025-04-21 20:44:54'),
+(709, 10, '/admin', '2025-04-21 20:44:58'),
+(710, 10, '/admin/chat', '2025-04-21 20:45:03'),
+(711, 10, '/admin', '2025-04-21 20:45:06'),
+(712, 10, '/admin/chat', '2025-04-21 20:45:07'),
+(713, 10, '/admin', '2025-04-21 20:45:08'),
+(714, 10, '/admin/chat', '2025-04-21 20:45:14'),
+(715, 10, '/admin', '2025-04-21 20:45:16'),
+(716, 10, '/admin/chat', '2025-04-21 20:45:18'),
+(717, 10, '/admin', '2025-04-21 20:45:24'),
+(718, 10, '/admin/chat', '2025-04-21 20:45:29'),
+(719, 10, '/admin', '2025-04-21 20:45:31'),
+(720, 10, '/login', '2025-04-21 20:47:31'),
+(721, 10, '/login', '2025-04-21 20:47:31'),
+(722, 8, '/home', '2025-04-21 20:47:35'),
+(723, 8, '/home', '2025-04-21 20:47:45'),
+(724, 8, '/home', '2025-04-21 20:47:45'),
+(725, 8, '/home', '2025-04-21 20:48:30'),
+(726, 8, '/home', '2025-04-21 20:50:36'),
+(727, 8, '/home', '2025-04-21 20:50:36'),
+(728, 8, '/home', '2025-04-21 20:50:41'),
+(729, 8, '/home', '2025-04-21 20:50:41'),
+(730, 8, '/home', '2025-04-21 20:52:03'),
+(731, 8, '/home', '2025-04-21 20:52:03'),
+(732, 8, '/home', '2025-04-21 20:52:49'),
+(733, 8, '/home', '2025-04-21 20:52:49'),
+(734, 8, '/home', '2025-04-21 20:53:11'),
+(735, 8, '/home', '2025-04-21 20:53:11'),
+(736, 8, '/home', '2025-04-21 20:55:49'),
+(737, 8, '/home', '2025-04-21 20:56:59'),
+(738, 8, '/home', '2025-04-21 20:56:59'),
+(739, NULL, '/login', '2025-04-21 20:57:00'),
+(740, NULL, '/login', '2025-04-21 20:57:02'),
+(741, NULL, '/login', '2025-04-21 20:57:02'),
+(742, 8, '/home', '2025-04-21 20:57:11'),
+(743, 8, '/home', '2025-04-21 20:59:25'),
+(744, 8, '/home', '2025-04-21 20:59:25'),
+(745, 8, '/home', '2025-04-21 20:59:52'),
+(746, 8, '/home', '2025-04-21 20:59:52'),
+(747, 8, '/home', '2025-04-21 21:00:06'),
+(748, 8, '/home', '2025-04-21 21:00:13'),
+(749, 8, '/home', '2025-04-21 21:00:13'),
+(750, 8, '/home', '2025-04-21 21:00:20'),
+(751, 8, '/home', '2025-04-21 21:00:58'),
+(752, 8, '/home', '2025-04-21 21:00:58'),
+(753, NULL, '/home', '2025-04-21 21:01:44'),
+(754, NULL, '/home', '2025-04-21 21:01:44'),
+(755, NULL, '/home', '2025-04-21 21:02:13'),
+(756, NULL, '/home', '2025-04-21 21:02:13'),
+(757, NULL, '/home', '2025-04-21 21:02:19'),
+(758, NULL, '/home', '2025-04-21 21:02:19'),
+(759, NULL, '/home', '2025-04-21 21:02:39'),
+(760, NULL, '/home', '2025-04-21 21:02:39'),
+(761, NULL, '/home', '2025-04-21 21:03:29'),
+(762, NULL, '/home', '2025-04-21 21:04:24'),
+(763, NULL, '/home', '2025-04-21 21:04:45'),
+(764, NULL, '/home', '2025-04-21 21:04:46'),
+(765, NULL, '/home', '2025-04-21 21:04:46'),
+(766, NULL, '/home', '2025-04-21 21:04:55'),
+(767, NULL, '/home', '2025-04-21 21:04:55'),
+(768, NULL, '/home', '2025-04-21 21:05:11'),
+(769, NULL, '/home', '2025-04-21 21:05:11'),
+(770, NULL, '/home', '2025-04-21 21:05:29'),
+(771, NULL, '/home', '2025-04-21 21:05:29'),
+(772, NULL, '/home', '2025-04-21 21:05:55'),
+(773, NULL, '/home', '2025-04-21 21:05:55'),
+(774, NULL, '/home', '2025-04-21 21:06:13'),
+(775, NULL, '/home', '2025-04-21 21:06:13'),
+(776, NULL, '/home', '2025-04-21 21:09:15'),
+(777, NULL, '/home', '2025-04-21 21:09:15'),
+(778, NULL, '/login', '2025-04-21 21:10:30'),
+(779, NULL, '/login', '2025-04-21 21:10:30'),
+(780, 8, '/home', '2025-04-21 21:10:33'),
+(781, 8, '/home', '2025-04-21 21:10:40'),
+(782, 8, '/home', '2025-04-21 21:10:40'),
+(783, 8, '/home', '2025-04-21 21:10:54'),
+(784, NULL, '/login', '2025-04-21 21:11:19'),
+(785, 10, '/admin', '2025-04-21 21:11:25'),
+(786, 10, '/admin/chat', '2025-04-21 21:11:26'),
+(787, 10, '/admin', '2025-04-21 21:11:29'),
+(788, NULL, '/login', '2025-04-21 21:11:34'),
+(789, 8, '/home', '2025-04-21 21:11:39'),
+(790, 8, '/home', '2025-04-21 21:12:56'),
+(791, 8, '/home', '2025-04-21 21:12:56');
 
 -- --------------------------------------------------------
 
@@ -507,7 +956,10 @@ CREATE TABLE `payments` (
 
 INSERT INTO `payments` (`id`, `bookingId`, `amount`, `status`, `paymentMethod`, `proofUrl`, `validatedBy`, `validatedAt`, `notes`, `created_at`, `stripePaymentIntentId`, `stripeClientSecret`, `stripeCustomerId`, `stripeChargeId`) VALUES
 (54, 54, 150.00, 'validated', 'cash_on_delivery', NULL, NULL, NULL, NULL, '2025-04-12 07:50:58', NULL, NULL, NULL, NULL),
-(55, 55, 300.00, 'validated', 'cash_on_delivery', NULL, NULL, NULL, NULL, '2025-04-14 10:32:40', NULL, NULL, NULL, NULL);
+(55, 55, 300.00, 'validated', 'cash_on_delivery', NULL, NULL, NULL, NULL, '2025-04-14 10:32:40', NULL, NULL, NULL, NULL),
+(56, 56, 300.00, 'pending', 'stripe', NULL, NULL, NULL, NULL, '2025-04-15 14:33:17', NULL, NULL, NULL, NULL),
+(57, 57, 150.00, 'pending', 'stripe', NULL, NULL, NULL, NULL, '2025-04-18 21:59:26', NULL, NULL, NULL, NULL),
+(58, 58, 150.00, 'validated', 'cash_on_delivery', NULL, NULL, NULL, NULL, '2025-04-21 10:43:35', NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -531,7 +983,7 @@ CREATE TABLE `reviews` (
 
 INSERT INTO `reviews` (`id`, `motor_id`, `user_id`, `rating`, `comment`, `created_at`, `seller_response`) VALUES
 (28, 2, 13, 4, 'waaaaa', '2025-04-11 16:16:10', NULL),
-(29, 2, 8, 5, 'jjj', '2025-04-14 10:56:12', NULL);
+(30, 2, 8, 4, 'nice', '2025-04-21 10:42:47', NULL);
 
 -- --------------------------------------------------------
 
@@ -564,12 +1016,204 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `email`, `password`, `role`, `isBlocked`, `isVerified`, `google_id`, `google_email`, `last_login`, `login_count`, `created_at`, `phone`, `address`, `bio`, `profileImageUrl`, `countryCode`) VALUES
-(8, 'Youssef', 'antf5m@gmail.com', '$2a$12$kgtW13zIsW64GiZ9VhWmY.fdJmqxpDU0N/eb0NPbMAzkx6VaVEb3y', 'user', 0, 0, '116966854962129316707', 'antf5m@gmail.com', '2025-04-13 20:42:46', 0, '2025-04-07 10:44:43', '655899003', 'Laayoune', NULL, NULL, '+212'),
-(9, 'Youssefhrd', 'youssefhrd@gmx.fr', '$2a$12$nT38OYYRIGtybU6nPkn9Hu3RW/iwny759.kLqwojdAOZfnpZcg6mS', 'seller', 0, 0, NULL, NULL, '2025-04-11 20:12:13', 0, '2025-04-07 10:46:01', NULL, NULL, NULL, NULL, '+212'),
-(10, 'F5M DESIGNER', 'f5mdesigner01@gmail.com', NULL, 'admin', 0, 0, '104386487207686996449', 'f5mdesigner01@gmail.com', '2025-04-14 12:45:47', 0, '2025-04-07 13:21:46', NULL, NULL, NULL, NULL, '+212'),
+(8, 'Youssef', 'antf5m@gmail.com', '$2a$12$kgtW13zIsW64GiZ9VhWmY.fdJmqxpDU0N/eb0NPbMAzkx6VaVEb3y', 'user', 0, 0, '116966854962129316707', 'antf5m@gmail.com', '2025-04-21 20:42:47', 0, '2025-04-07 10:44:43', '655899003', 'Laayoune', NULL, '/uploads/profiles/profile-1744728160315.jpg', '+212'),
+(9, 'Youssefhrd', 'youssefhrd@gmx.fr', '$2a$12$nT38OYYRIGtybU6nPkn9Hu3RW/iwny759.kLqwojdAOZfnpZcg6mS', 'seller', 0, 0, NULL, NULL, '2025-04-21 00:31:25', 0, '2025-04-07 10:46:01', NULL, NULL, NULL, NULL, '+212'),
+(10, 'F5M DESIGNER', 'f5mdesigner01@gmail.com', NULL, 'admin', 0, 0, '104386487207686996449', 'f5mdesigner01@gmail.com', '2025-04-21 21:11:29', 0, '2025-04-07 13:21:46', NULL, NULL, NULL, NULL, '+212'),
 (11, 'ennah', '123ennah@gmail.com', '$2a$12$2gC2nmUyI2t3SO8wAnFMMe.ardReg.Lc7aCo6vSpUJNHr4eUS3bz.', 'seller', 0, 0, NULL, NULL, '2025-04-07 13:57:21', 0, '2025-04-07 13:55:24', NULL, NULL, NULL, NULL, '+212'),
 (12, 'ANT F5M44', 'monacomizaret@gmail.com', NULL, 'user', 0, 0, '111287792489336979205', 'monacomizaret@gmail.com', '2025-04-08 09:21:21', 0, '2025-04-08 09:21:21', NULL, NULL, NULL, NULL, '+212'),
-(13, 'Youness', 'ccyat0518@gmail.com', '$2a$12$fUe/.Vwudi182q.GI82IL.fJhJWF1IF7j34wRafEW0qj5o2K9yYoS', 'user', 0, 0, NULL, NULL, '2025-04-11 15:53:42', 0, '2025-04-10 16:58:57', '644819899', NULL, NULL, NULL, '+212');
+(13, 'Youness', 'ccyat0518@gmail.com', '$2a$12$fUe/.Vwudi182q.GI82IL.fJhJWF1IF7j34wRafEW0qj5o2K9yYoS', 'user', 0, 0, '115451346640593207465', 'ccyat0518@gmail.com', '2025-04-15 14:25:57', 0, '2025-04-10 16:58:57', '644819899', NULL, NULL, NULL, '+212'),
+(14, 'shop', 'shop011112@gmail.com', NULL, 'user', 0, 0, '115411759014144615555', 'shop011112@gmail.com', '2025-04-18 23:15:05', 0, '2025-04-18 23:15:05', NULL, NULL, NULL, NULL, '+212');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_sessions`
+--
+
+CREATE TABLE `user_sessions` (
+  `id` int(11) NOT NULL,
+  `userId` int(11) DEFAULT NULL,
+  `browser` varchar(255) NOT NULL,
+  `userAgent` text NOT NULL,
+  `lastActive` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user_sessions`
+--
+
+INSERT INTO `user_sessions` (`id`, `userId`, `browser`, `userAgent`, `lastActive`) VALUES
+(535, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:33'),
+(536, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:33'),
+(537, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:36'),
+(538, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:36'),
+(539, NULL, 'Microsoft Edge, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0', '2025-04-21 18:10:40'),
+(540, NULL, 'Microsoft Edge, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 Edg/135.0.0.0', '2025-04-21 18:10:40'),
+(541, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0', '2025-04-21 18:10:43'),
+(542, NULL, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0', '2025-04-21 18:10:44'),
+(543, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:45'),
+(544, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:45'),
+(545, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:58'),
+(546, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:10:58'),
+(547, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:11:04'),
+(548, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:11:05'),
+(549, NULL, 'Brave, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:11:49'),
+(550, NULL, 'Brave, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:11:49'),
+(551, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:11:54'),
+(552, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 18:11:54'),
+(553, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:20:46'),
+(554, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:20:46'),
+(555, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:29:08'),
+(556, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:29:08'),
+(557, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:29:40'),
+(558, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:29:40'),
+(559, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:30:32'),
+(560, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:30:32'),
+(561, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:30:48'),
+(562, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:30:48'),
+(563, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:31:06'),
+(564, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:31:06'),
+(565, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:31:16'),
+(566, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:31:16'),
+(567, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:31:56'),
+(568, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:31:56'),
+(569, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:32:14'),
+(570, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:32:15'),
+(571, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:32:29'),
+(572, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:32:29'),
+(573, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:32:45'),
+(574, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:32:45'),
+(575, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:33:09'),
+(576, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:33:09'),
+(577, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:33:43'),
+(578, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:33:43'),
+(579, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:34:19'),
+(580, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:34:19'),
+(581, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:34:47'),
+(582, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:34:48'),
+(583, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:35:25'),
+(584, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:35:25'),
+(585, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:35:52'),
+(586, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:35:59'),
+(587, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:35:59'),
+(588, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:37:58'),
+(589, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:37:59'),
+(590, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:39:02'),
+(591, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:39:02'),
+(592, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:39:18'),
+(593, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:39:18'),
+(594, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:40:35'),
+(595, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:40:36'),
+(596, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:40:54'),
+(597, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:40:54'),
+(598, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:41:12'),
+(599, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:41:13'),
+(600, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:41:47'),
+(601, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:41:47'),
+(602, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:42:45'),
+(603, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:42:45'),
+(604, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:42:49'),
+(605, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:42:49'),
+(606, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:43:07'),
+(607, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:43:07'),
+(608, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:43:55'),
+(609, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:43:55'),
+(610, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:45:18'),
+(611, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:45:18'),
+(612, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:47:32'),
+(613, 10, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:47:32'),
+(614, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:47:45'),
+(615, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:47:45'),
+(616, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:48:30'),
+(617, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:50:37'),
+(618, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:50:37'),
+(619, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:50:42'),
+(620, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:50:42'),
+(621, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:52:03'),
+(622, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:52:03'),
+(623, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:52:49'),
+(624, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:52:49'),
+(625, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:53:11'),
+(626, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:53:12'),
+(627, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:55:50'),
+(628, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:55:50'),
+(629, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:56:59'),
+(630, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:56:59'),
+(631, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:57:02'),
+(632, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:57:03'),
+(633, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:59:25'),
+(634, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:59:26'),
+(635, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:59:53'),
+(636, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 20:59:53'),
+(637, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:07'),
+(638, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:07'),
+(639, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:14'),
+(640, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:14'),
+(641, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:21'),
+(642, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:21'),
+(643, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:58'),
+(644, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:00:58'),
+(645, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:01:45'),
+(646, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:01:45'),
+(647, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:02:14'),
+(648, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:02:14'),
+(649, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:02:19'),
+(650, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:02:20'),
+(651, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:02:39'),
+(652, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:02:39'),
+(653, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:04:25'),
+(654, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:04:46'),
+(655, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:04:47'),
+(656, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:04:47'),
+(657, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:04:56'),
+(658, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:04:56'),
+(659, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:05:11'),
+(660, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:05:11'),
+(661, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:05:30'),
+(662, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:05:30'),
+(663, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:05:55'),
+(664, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:05:56'),
+(665, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:06:14'),
+(666, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:06:14'),
+(667, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:09:16'),
+(668, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:09:16'),
+(669, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:10:30'),
+(670, NULL, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:10:30'),
+(671, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:10:40'),
+(672, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:10:41'),
+(673, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:10:54'),
+(674, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:10:54'),
+(675, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:12:57'),
+(676, 8, 'Google Chrome, Not-A.Brand, Chromium', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36', '2025-04-21 21:12:57');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `visitor_countries`
+--
+
+CREATE TABLE `visitor_countries` (
+  `id` int(11) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `country_code` char(2) DEFAULT NULL,
+  `country_name` varchar(100) DEFAULT NULL,
+  `region` varchar(50) DEFAULT NULL,
+  `region_name` varchar(100) DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `timezone` varchar(100) DEFAULT NULL,
+  `isp` varchar(255) DEFAULT NULL,
+  `visit_count` int(11) DEFAULT 1,
+  `first_visit` datetime NOT NULL,
+  `last_visit` datetime NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `visitor_countries`
+--
+
+INSERT INTO `visitor_countries` (`id`, `ip_address`, `country_code`, `country_name`, `region`, `region_name`, `city`, `timezone`, `isp`, `visit_count`, `first_visit`, `last_visit`) VALUES
+(38, '196.206.52.68', 'MA', 'Morocco', '04', 'Rabat-Salé-Kénitra', 'Rabat', 'Africa/Casablanca', 'IP ADSL MarocTelecom', 333, '2025-04-21 17:27:27', '2025-04-21 22:12:57'),
+(46, '5.253.115.96', 'DE', 'Germany', 'HE', 'Hesse', 'Frankfurt am Main', 'Europe/Berlin', 'Clouvider Limited', 4, '2025-04-21 17:31:25', '2025-04-21 17:31:27');
 
 --
 -- Indexes for dumped tables
@@ -582,6 +1226,21 @@ ALTER TABLE `bookings`
   ADD PRIMARY KEY (`id`),
   ADD KEY `motorId` (`motorId`),
   ADD KEY `userId` (`userId`);
+
+--
+-- Indexes for table `chat_messages`
+--
+ALTER TABLE `chat_messages`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `room_id` (`room_id`),
+  ADD KEY `sender_id` (`sender_id`);
+
+--
+-- Indexes for table `chat_rooms`
+--
+ALTER TABLE `chat_rooms`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
 
 --
 -- Indexes for table `countries`
@@ -633,6 +1292,13 @@ ALTER TABLE `orders`
   ADD KEY `userId` (`userId`);
 
 --
+-- Indexes for table `page_views`
+--
+ALTER TABLE `page_views`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `userId` (`userId`);
+
+--
 -- Indexes for table `payments`
 --
 ALTER TABLE `payments`
@@ -656,6 +1322,20 @@ ALTER TABLE `users`
   ADD UNIQUE KEY `email` (`email`);
 
 --
+-- Indexes for table `user_sessions`
+--
+ALTER TABLE `user_sessions`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `userId` (`userId`);
+
+--
+-- Indexes for table `visitor_countries`
+--
+ALTER TABLE `visitor_countries`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_ip` (`ip_address`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -663,7 +1343,19 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `bookings`
 --
 ALTER TABLE `bookings`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
+
+--
+-- AUTO_INCREMENT for table `chat_messages`
+--
+ALTER TABLE `chat_messages`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `chat_rooms`
+--
+ALTER TABLE `chat_rooms`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `countries`
@@ -699,7 +1391,7 @@ ALTER TABLE `motor_locations`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=469;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=476;
 
 --
 -- AUTO_INCREMENT for table `orders`
@@ -708,22 +1400,40 @@ ALTER TABLE `orders`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `page_views`
+--
+ALTER TABLE `page_views`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=792;
+
+--
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
 
 --
 -- AUTO_INCREMENT for table `reviews`
 --
 ALTER TABLE `reviews`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+
+--
+-- AUTO_INCREMENT for table `user_sessions`
+--
+ALTER TABLE `user_sessions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=677;
+
+--
+-- AUTO_INCREMENT for table `visitor_countries`
+--
+ALTER TABLE `visitor_countries`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=375;
 
 --
 -- Constraints for dumped tables
@@ -735,6 +1445,19 @@ ALTER TABLE `users`
 ALTER TABLE `bookings`
   ADD CONSTRAINT `bookings_ibfk_1` FOREIGN KEY (`motorId`) REFERENCES `motors` (`id`),
   ADD CONSTRAINT `bookings_ibfk_2` FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `chat_messages`
+--
+ALTER TABLE `chat_messages`
+  ADD CONSTRAINT `chat_messages_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `chat_rooms` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `chat_messages_ibfk_2` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `chat_rooms`
+--
+ALTER TABLE `chat_rooms`
+  ADD CONSTRAINT `chat_rooms_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `insurance_records`
@@ -774,6 +1497,12 @@ ALTER TABLE `orders`
   ADD CONSTRAINT `orders_ibfk_2` FOREIGN KEY (`userId`) REFERENCES `users` (`id`);
 
 --
+-- Constraints for table `page_views`
+--
+ALTER TABLE `page_views`
+  ADD CONSTRAINT `page_views_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
 -- Constraints for table `payments`
 --
 ALTER TABLE `payments`
@@ -786,6 +1515,12 @@ ALTER TABLE `payments`
 ALTER TABLE `reviews`
   ADD CONSTRAINT `reviews_ibfk_1` FOREIGN KEY (`motor_id`) REFERENCES `motors` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `reviews_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_sessions`
+--
+ALTER TABLE `user_sessions`
+  ADD CONSTRAINT `user_sessions_ibfk_1` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

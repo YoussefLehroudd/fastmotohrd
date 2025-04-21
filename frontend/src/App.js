@@ -16,6 +16,8 @@ import CreateBooking from './pages/CreateBooking';
 import SellerOrders from './components/SellerOrders';
 import SellerPayments from './components/SellerPayments';
 import SellerReviews from './components/SellerReviews';
+import AdminChat from './components/admin/AdminChat';
+import ChatWidget from './components/chat/ChatWidget';
 import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import MotorDetails from './pages/MotorDetails';
@@ -37,6 +39,7 @@ function App() {
       <UserProvider>
         <Router>
           <RouteTracker />
+          <ChatWidget />
           <Routes>
             <Route path="/signup" element={<Signup />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
@@ -48,10 +51,13 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/login" element={<Login />} />
             <Route 
-              path="/admin" 
+              path="/admin/*" 
               element={
                 <ProtectedRoute roles={['admin']}>
-                  <Admin />
+                  <Routes>
+                    <Route path="/" element={<Admin />} />
+                    <Route path="/chat" element={<AdminChat />} />
+                  </Routes>
                 </ProtectedRoute>
               } 
             />
