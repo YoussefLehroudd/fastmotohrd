@@ -78,28 +78,34 @@ router.post('/session', verifyTokenOptional, async (req, res) => {
   }
 });
 
-// Get visitor country statistics
+// Get visitor country statistics with percentages
 router.get('/country-stats', async (req, res) => {
   try {
+    // First get total visits across all countries
+    const [totalResult] = await db.query(`
+      SELECT SUM(visit_count) as total_visits
+      FROM visitor_countries
+    `);
+    const totalVisits = totalResult[0].total_visits || 0;
+
+    // Then get per-country statistics with percentage
     const [stats] = await db.query(`
       SELECT 
-        country_code,
         country_name,
-        region,
-        region_name,
-        city,
-        timezone,
-        isp,
-        COUNT(*) as unique_visitors,
-        SUM(visit_count) as total_visits,
-        MIN(first_visit) as earliest_visit,
-        MAX(last_visit) as latest_visit
+        SUM(visit_count) as visits,
+        (SUM(visit_count) / ${totalVisits} * 100) as percentage
       FROM visitor_countries
-      GROUP BY country_code, country_name, region, region_name, city, timezone, isp
-      ORDER BY total_visits DESC
+      GROUP BY country_name
+      ORDER BY visits DESC
     `);
     
-    res.json(stats);
+    // Format percentages to 2 decimal places
+    const formattedStats = stats.map(stat => ({
+      country_name: stat.country_name || 'Unknown',
+      percentage: Number(stat.percentage).toFixed(2)
+    }));
+    
+    res.json(formattedStats);
   } catch (error) {
     console.error('Error fetching country stats:', error);
     res.status(500).json({ message: 'Error fetching country statistics', error: error.message });

@@ -135,6 +135,28 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
     stats.topBrowsers = topBrowsers;
     stats.topPages = topPages;
 
+    // Get visitor countries statistics with percentages
+    const [totalVisits] = await db.query(`
+      SELECT SUM(visit_count) as total_visits
+      FROM visitor_countries
+    `);
+    const total = totalVisits[0].total_visits || 0;
+
+    const [visitorCountries] = await db.query(`
+      SELECT 
+        country_name,
+        SUM(visit_count) as visits,
+        (SUM(visit_count) / ${total} * 100) as percentage
+      FROM visitor_countries
+      GROUP BY country_name
+      ORDER BY visits DESC
+    `);
+
+    stats.visitorCountries = visitorCountries.map(stat => ({
+      country_name: stat.country_name || 'Unknown',
+      percentage: Number(stat.percentage).toFixed(2)
+    }));
+
     res.json(stats);
   } catch (error) {
     console.error('Error fetching admin stats:', error);

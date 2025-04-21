@@ -6,6 +6,15 @@ import {
   BookOnline as BookingIcon,
   Payment as PaymentIcon,
 } from '@mui/icons-material';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Marker,
+  ZoomableGroup
+} from "react-simple-maps";
+
+const geoUrl = "https://unpkg.com/world-atlas@2.0.2/countries-110m.json";
 
 const StatCard = ({ title, value, icon: Icon, color }) => (
   <Card sx={{ height: '100%', backgroundColor: color, color: 'white' }}>
@@ -181,6 +190,121 @@ const AdminStats = ({ stats }) => {
               value: `${page.views} (views)`
             }))}
           />
+        </Grid>
+      </Grid>
+
+      {/* Visitor Countries */}
+      <Grid container spacing={3} sx={{ mt: 3 }}>
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ color: '#1976d2' }}>
+                Visitor Countries Map
+              </Typography>
+              <Divider sx={{ my: 1 }} />
+              <Box sx={{ width: '100%', height: '350px', backgroundColor: '#141414', position: 'relative', overflow: 'hidden' }}>
+                <ComposableMap
+                  projection="geoMercator"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                  }}
+                >
+                  <ZoomableGroup center={[-5, 30]} zoom={3.2}>
+                    <Geographies geography={geoUrl}>
+                      {({ geographies }) =>
+                        geographies.map((geo) => {
+                          const isVisited = stats.visitorCountries?.find(
+                            c => c.country_name === geo.properties.name
+                          );
+                          return (
+                            <Geography
+                              key={geo.rsmKey}
+                              geography={geo}
+                              fill={isVisited ? "#0088ff" : "#1f1f1f"}
+                              stroke="#333"
+                              strokeWidth={0.5}
+                              style={{
+                                default: {
+                                  outline: "none",
+                                  cursor: isVisited ? "pointer" : "default"
+                                },
+                                hover: {
+                                  fill: isVisited ? "#2196f3" : "#3f3f3f",
+                                  outline: "none"
+                                }
+                              }}
+                              onMouseEnter={(e) => {
+                                if (isVisited) {
+                                  const tooltip = document.createElement('div');
+                                  tooltip.id = 'country-tooltip';
+                                  tooltip.style.position = 'fixed';
+                                  tooltip.style.backgroundColor = '#0088ff';
+                                  tooltip.style.color = 'white';
+                                  tooltip.style.padding = '6px 12px';
+                                  tooltip.style.borderRadius = '4px';
+                                  tooltip.style.fontSize = '14px';
+                                  tooltip.style.fontWeight = '500';
+                                  tooltip.style.zIndex = '9999';
+                                  tooltip.style.pointerEvents = 'none';
+                                  tooltip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+                                  tooltip.style.whiteSpace = 'nowrap';
+                                  const percentage = stats.visitorCountries.find(c => c.country_name === geo.properties.name)?.percentage;
+                                  tooltip.innerHTML = `${geo.properties.name}: ${percentage}%`;
+                                  document.body.appendChild(tooltip);
+                                  
+                                  function updatePosition(e) {
+                                    tooltip.style.left = (e.clientX + 10) + 'px';
+                                    tooltip.style.top = (e.clientY - 10) + 'px';
+                                  }
+                                  updatePosition(e);
+                                  document.addEventListener('mousemove', updatePosition);
+                                  tooltip.updatePosition = updatePosition;
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                const tooltip = document.getElementById('country-tooltip');
+                                if (tooltip && tooltip.updatePosition) {
+                                  document.removeEventListener('mousemove', tooltip.updatePosition);
+                                  document.body.removeChild(tooltip);
+                                }
+                              }}
+                            />
+                          );
+                        })
+                      }
+                    </Geographies>
+                  </ZoomableGroup>
+                </ComposableMap>
+              </Box>
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, color: '#666' }}>
+                  Top regions
+                </Typography>
+                {stats.visitorCountries?.map((country, index) => (
+                  <Box 
+                    key={index} 
+                    sx={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      py: 1,
+                      '&:not(:last-child)': {
+                        borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
+                      }
+                    }}
+                  >
+                    <Typography variant="body1" sx={{ color: '#333' }}>
+                      {country.country_name}
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 500, color: '#0088ff' }}>
+                      {country.percentage}%
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
     </Box>
