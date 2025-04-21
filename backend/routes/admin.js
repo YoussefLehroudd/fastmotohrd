@@ -109,7 +109,8 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
     const [topBrowsers] = await db.query(`
       SELECT 
         CASE
-          WHEN browser LIKE '%Chrome%' THEN 'Google Chrome'
+          WHEN browser LIKE '%Brave%' THEN 'Brave'
+          WHEN browser LIKE '%Chrome%' AND browser NOT LIKE '%Brave%' THEN 'Chrome'
           WHEN browser LIKE '%Firefox%' THEN 'Mozilla Firefox'
           WHEN browser LIKE '%Safari%' AND browser NOT LIKE '%Chrome%' THEN 'Safari'
           WHEN browser LIKE '%Edge%' THEN 'Microsoft Edge'
@@ -150,8 +151,7 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
         c.flag,
         c.flag_image
       FROM visitor_countries vc
-      LEFT JOIN countries c ON CONVERT(c.name USING utf8mb4) COLLATE utf8mb4_general_ci = 
-                             CONVERT(vc.country_name USING utf8mb4) COLLATE utf8mb4_general_ci
+      LEFT JOIN countries c ON c.name = vc.country_name COLLATE utf8mb4_general_ci
       GROUP BY vc.country_name, c.flag, c.flag_image
       ORDER BY visits DESC
     `);

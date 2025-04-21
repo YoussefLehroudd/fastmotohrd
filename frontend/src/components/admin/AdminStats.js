@@ -61,11 +61,29 @@ const DetailCard = ({ title, details }) => (
   </Card>
 );
 
+const getBrowserIcon = (browser) => {
+  // Extract browser name and convert to lowercase
+  const browserName = browser.toLowerCase().split(' ')[0];
+  console.log(browserName)
+  
+  // Use Google's favicon service which is more reliable
+  return `https://www.google.com/s2/favicons?domain=${browserName}.com&sz=128`;
+};
+
 const BrowserItem = ({ index, browser, sessions }) => {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, my: 1 }}>
       <Typography sx={{ minWidth: 24 }}>{index}.</Typography>
-      <Typography sx={{ flex: 1 }}>{browser}</Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1 }}>
+        <Box sx={{ width: 24, height: 24, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img 
+            src={getBrowserIcon(browser)}
+            alt={browser}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        </Box>
+        <Typography>{browser}</Typography>
+      </Box>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Typography sx={{ fontWeight: 'bold' }}>{sessions} (sessions)</Typography>
       </Box>
