@@ -71,33 +71,12 @@ const AdminChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const typingTimeoutRef = useRef(null);
+
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
 
-    // Fetch chat rooms
-    fetch('http://localhost:5000/api/chat/history', {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Failed to fetch chat history');
-        }
-        return res.json();
-      })
-      .then(data => {
-        setRooms(data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error fetching chat history:', error);
-        setLoading(false);
-      });
-
-    // Connect socket
+    // Connect socket first
     const newSocket = io('http://localhost:5000', {
       withCredentials: true,
       transports: ['websocket']
@@ -105,6 +84,29 @@ const AdminChat = () => {
 
     newSocket.on('connect', () => {
       console.log('Admin connected to socket');
+      
+      // Fetch chat rooms after successful socket connection
+      fetch('http://localhost:5000/api/chat/history', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+        .then(res => {
+          if (!res.ok) {
+            throw new Error('Failed to fetch chat history');
+          }
+          return res.json();
+        })
+        .then(data => {
+          setRooms(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching chat history:', error);
+          setLoading(false);
+        });
     });
 
     newSocket.on('connect_error', (error) => {
@@ -113,18 +115,46 @@ const AdminChat = () => {
 
     newSocket.on('new_message', (message) => {
       setRooms(prevRooms => {
-        return prevRooms.map(room => {
-          if (room.id === message.room_id) {
-            return {
-              ...room,
-              messages: [...(room.messages || []), message],
-              updated_at: new Date().toISOString()
-            };
-          }
-          return room;
-        }).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+        // Find the room
+        const roomIndex = prevRooms.findIndex(r => r.id === message.room_id);
+        
+        if (roomIndex === -1) {
+          // If room doesn't exist, fetch all rooms again
+          fetch('http://localhost:5000/api/chat/history', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+            .then(res => res.json())
+            .then(data => {
+              setRooms(data);
+            })
+            .catch(error => {
+              console.error('Error fetching updated rooms:', error);
+            });
+          return prevRooms;
+        }
+
+        // Update existing room
+        const updatedRooms = [...prevRooms];
+        const room = updatedRooms[roomIndex];
+        
+        updatedRooms[roomIndex] = {
+          ...room,
+          messages: [...(room.messages || []), message],
+          updated_at: new Date().toISOString()
+        };
+
+        // If this is the selected room, scroll to bottom
+        if (selectedRoom?.id === message.room_id) {
+          setTimeout(scrollToBottom, 100);
+        }
+
+        // Sort rooms by latest message
+        return updatedRooms.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       });
-      scrollToBottom();
     });
 
     newSocket.on('typing_status', ({ roomId, isTyping: typing }) => {
@@ -140,9 +170,44 @@ const AdminChat = () => {
     };
   }, [user]);
 
+  // Scroll to bottom when messages change or room is selected
   useEffect(() => {
-    scrollToBottom();
-  }, [selectedRoom?.messages]);
+    if (selectedRoom?.messages?.length > 0) {
+      scrollToBottom();
+    }
+  }, [selectedRoom?.messages, selectedRoom]);
+
+  // Update selected room when rooms change
+  useEffect(() => {
+    if (selectedRoom) {
+      const updatedRoom = rooms.find(room => room.id === selectedRoom.id);
+      if (updatedRoom && JSON.stringify(updatedRoom) !== JSON.stringify(selectedRoom)) {
+        setSelectedRoom(updatedRoom);
+      }
+    }
+  }, [rooms]);
+
+  const handleTyping = (e) => {
+    setMessage(e.target.value);
+    
+    if (socket && selectedRoom) {
+      socket.emit('typing', {
+        roomId: selectedRoom.id,
+        isTyping: true
+      });
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit('typing', {
+          roomId: selectedRoom.id,
+          isTyping: false
+        });
+      }, 1000);
+    }
+  };
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -154,6 +219,15 @@ const AdminChat = () => {
     });
 
     setMessage('');
+    
+    // Clear typing indicator when sending message
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      socket.emit('typing', {
+        roomId: selectedRoom.id,
+        isTyping: false
+      });
+    }
   };
 
   if (!user || user.role !== 'admin') {
@@ -248,7 +322,7 @@ const AdminChat = () => {
                   size="small"
                   placeholder="Type a message..."
                   value={message}
-                  onChange={(e) => setMessage(e.target.value)}
+                  onChange={handleTyping}
                 />
                 <IconButton type="submit" color="primary">
                   <SendIcon />
