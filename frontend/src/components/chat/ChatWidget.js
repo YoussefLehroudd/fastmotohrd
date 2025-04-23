@@ -98,6 +98,11 @@ const ChatWidget = () => {
 
     setSocket(newSocket);
 
+    // Listen for admin_messages_read event to reset unread count
+    newSocket.on('admin_messages_read', ({ roomId }) => {
+      setUnreadCount(0);
+    });
+
     // Get initial chat room and messages
     fetch('http://localhost:5000/api/chat/room', {
       method: 'POST',
@@ -263,7 +268,7 @@ const ChatWidget = () => {
         onClick={toggleChat}
       >
         <Badge 
-          badgeContent={isOpen ? 0 : messages.filter(m => m.sender_type === 'admin').length}
+          badgeContent={isOpen ? 0 : messages.filter(m => m.sender_type === 'admin' && !m.is_read).length}
           color="primary"
           sx={{ 
             "& .MuiBadge-badge": {

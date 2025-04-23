@@ -99,6 +99,12 @@ const handleConnection = async (socket) => {
           roomId,
           unreadCount: unreadResult[0].count
         });
+
+        // Notify seller that admin messages are read
+        const [room] = await db.query('SELECT user_id FROM chat_rooms WHERE id = ?', [roomId]);
+        if (room.length > 0) {
+          io.to(`user_${room[0].user_id}`).emit('admin_messages_read', { roomId });
+        }
       } else {
         await db.query(
           'UPDATE chat_messages SET is_read = true WHERE room_id = ? AND sender_type = ?',
