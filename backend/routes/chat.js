@@ -11,9 +11,25 @@ router.get('/history', verifyToken, async (req, res) => {
 
     let rooms;
     if (userType === 'admin') {
-      // Admin can see all chat rooms
+      // Admin can see all chat rooms with message counts
       [rooms] = await db.query(`
-        SELECT cr.*, u.username as user_name, u.email as user_email 
+        SELECT 
+          cr.*,
+          u.username as user_name,
+          u.email as user_email,
+          (SELECT COUNT(*) 
+           FROM chat_messages cm 
+           WHERE cm.room_id = cr.id 
+           AND cm.sender_type = 'seller' 
+           AND cm.is_read = false) as unread_count,
+          (SELECT COUNT(*) 
+           FROM chat_messages cm 
+           WHERE cm.room_id = cr.id 
+           AND cm.sender_type = 'admin') as messages_sent,
+          (SELECT COUNT(*) 
+           FROM chat_messages cm 
+           WHERE cm.room_id = cr.id 
+           AND cm.sender_type = 'seller') as messages_received
         FROM chat_rooms cr
         JOIN users u ON cr.user_id = u.id
         ORDER BY cr.updated_at DESC
@@ -116,12 +132,23 @@ router.put('/messages/read', verifyToken, async (req, res) => {
   try {
     const { roomId } = req.body;
     const userId = req.user.id;
+    const userType = req.user.role;
 
-    await db.query(`
-      UPDATE chat_messages 
-      SET is_read = TRUE
-      WHERE room_id = ? AND sender_id != ?
-    `, [roomId, userId]);
+    if (userType === 'admin') {
+      // Mark seller messages as read
+      await db.query(`
+        UPDATE chat_messages 
+        SET is_read = TRUE
+        WHERE room_id = ? AND sender_type = 'seller'
+      `, [roomId]);
+    } else {
+      // Mark admin messages as read
+      await db.query(`
+        UPDATE chat_messages 
+        SET is_read = TRUE
+        WHERE room_id = ? AND sender_type = 'admin'
+      `, [roomId]);
+    }
 
     res.json({ message: 'Messages marked as read' });
   } catch (error) {

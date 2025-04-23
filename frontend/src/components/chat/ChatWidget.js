@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Paper, IconButton, TextField, Badge, Fab } from '@mui/material';
+import { Box, Paper, IconButton, TextField, Badge, Fab, Typography } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
@@ -56,111 +56,90 @@ const ChatWidget = () => {
   useEffect(() => {
     if (!user || user.role === 'admin') return;
 
-    if (isOpen) {
-      // First create/get chat room
-      fetch('http://localhost:5000/api/chat/room', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-        .then(res => {
-          if (!res.ok) {
-            throw new Error('Failed to create chat room');
-          }
-          return res.json();
-        })
-        .then(roomData => {
-          console.log('Room created:', roomData);
-          setRoom(roomData);
-          // Initialize messages from room data
-          const initialMessages = roomData.messages || [];
-          setMessages(initialMessages);
-          setUnreadCount(initialMessages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length);
-          scrollToBottom();
-          
-          // Then connect socket
-          const newSocket = io('http://localhost:5000', {
-            withCredentials: true,
-            transports: ['websocket']
-          });
+    // Initialize socket
+    const newSocket = io('http://localhost:5000', {
+      withCredentials: true,
+      transports: ['websocket']
+    });
 
-          newSocket.on('connect', () => {
-            console.log('Connected to socket');
-            // Request unread messages after connecting
-            if (room?.id) {
-              newSocket.emit('get_unread_messages', { roomId: room.id });
-            }
-          });
+    newSocket.on('connect', () => {
+      console.log('Connected to socket');
+    });
 
-          newSocket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-          });
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
 
     newSocket.on('new_message', (message) => {
       console.log('New message received:', message);
-      // Check if message already exists
       setMessages(prev => {
-        if (prev.some(msg => msg.id === message.id)) {
-          return prev;
+        if (prev.some(msg => msg.id === message.id)) return prev;
+        const newMessages = [...prev, message];
+        // Only increment unread count if chat is closed and message is unread
+        if (message.sender_type === 'admin' && !isOpen && !message.is_read) {
+          setUnreadCount(prev => prev + 1);
         }
-        return [...prev, message];
+        return newMessages;
       });
-      // Only increment unread count for admin messages when chat is closed
-      if (!isOpen && message.sender_type === 'admin') {
-        setUnreadCount(prev => prev + 1);
-      }
-      scrollToBottom();
+      if (isOpen) scrollToBottom();
     });
 
-          newSocket.on('typing_status', ({ isTyping: typing }) => {
-            setIsTyping(typing);
-          });
+    newSocket.on('typing_status', ({ isTyping: typing }) => {
+      setIsTyping(typing);
+    });
 
-          newSocket.on('message_deleted', ({ messageId }) => {
-            setMessages(prev => prev.filter(msg => msg.id !== messageId));
-          });
+    newSocket.on('message_deleted', ({ messageId }) => {
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    });
 
-          newSocket.on('conversation_deleted', () => {
-            setMessages([]);
-          });
+    newSocket.on('conversation_deleted', () => {
+      setMessages([]);
+    });
 
-          newSocket.on('unread_messages', (messages) => {
-            // Only add messages that aren't already in the list
-            setMessages(prev => {
-              const existingIds = new Set(prev.map(msg => msg.id));
-              const newMessages = messages.filter(msg => !existingIds.has(msg.id));
-              return [...prev, ...newMessages];
-            });
-            // Update unread count for admin messages only
-            const unreadAdminMessages = messages.filter(msg => !msg.is_read && msg.sender_type === 'admin');
-            if (!isOpen && unreadAdminMessages.length > 0) {
-              setUnreadCount(unreadAdminMessages.length);
-            }
-          });
+    setSocket(newSocket);
 
-          newSocket.on('error', (error) => {
-            console.error('Socket error:', error);
-          });
+    // Get initial chat room and messages
+    fetch('http://localhost:5000/api/chat/room', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to create chat room');
+        return res.json();
+      })
+      .then(roomData => {
+        setRoom(roomData);
+        const initialMessages = roomData.messages || [];
+        setMessages(initialMessages);
+        setUnreadCount(initialMessages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length);
+      })
+      .catch(error => {
+        console.error('Chat initialization error:', error);
+      });
 
-          setSocket(newSocket);
-        })
-        .catch(error => {
-          console.error('Chat initialization error:', error);
-        });
+    return () => {
+      newSocket.close();
+    };
+  }, [user]);
 
-      return () => {
-        if (socket) {
-          socket.close();
-          setSocket(null);
-        }
-      };
-    }
-  }, [isOpen, user]);
-
+  // Handle chat open/close
   useEffect(() => {
-    scrollToBottom();
+    if (isOpen && socket && room) {
+      // Mark messages as read when opening chat
+      socket.emit('mark_messages_read', { roomId: room.id });
+      setUnreadCount(0);
+      scrollToBottom();
+    }
+  }, [isOpen]);
+
+  // Handle new messages scroll
+  useEffect(() => {
+    if (isOpen) {
+      scrollToBottom();
+    }
   }, [messages]);
 
   const handleSend = (e) => {
@@ -198,7 +177,6 @@ const ChatWidget = () => {
   };
 
   const toggleChat = () => {
-    setIsOpen(!isOpen);
     if (!isOpen) {
       setUnreadCount(0);
       // Mark messages as read when opening chat
@@ -206,6 +184,7 @@ const ChatWidget = () => {
         socket.emit('mark_messages_read', { roomId: room.id });
       }
     }
+    setIsOpen(!isOpen);
   };
 
   if (!user || user.role === 'admin') return null;
@@ -222,7 +201,12 @@ const ChatWidget = () => {
             justifyContent: 'space-between',
             alignItems: 'center'
           }}>
-            <Box>Support Chat</Box>
+            <Box>
+              <Box>Support Chat</Box>
+              <Typography variant="caption" color="textSecondary">
+                {`Messages from admin: ${messages.filter(m => m.sender_type === 'admin').length}`}
+              </Typography>
+            </Box>
             <IconButton size="small" onClick={toggleChat}>
               <CloseIcon />
             </IconButton>
@@ -278,7 +262,17 @@ const ChatWidget = () => {
         sx={{ position: 'fixed', bottom: 16, right: 16 }}
         onClick={toggleChat}
       >
-        <Badge badgeContent={unreadCount} color="error">
+        <Badge 
+          badgeContent={isOpen ? 0 : messages.filter(m => m.sender_type === 'admin').length}
+          color="primary"
+          sx={{ 
+            "& .MuiBadge-badge": {
+              fontSize: "0.8rem",
+              minWidth: "20px",
+              height: "20px"
+            }
+          }}
+        >
           <ChatIcon />
         </Badge>
       </Fab>
