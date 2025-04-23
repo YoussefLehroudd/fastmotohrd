@@ -36,140 +36,218 @@ router.post('/check-email', async (req, res) => {
   }
 });
 
-// Google authentication
 router.post('/google', async (req, res) => {
+  // console.log('================================================');
+  // console.log('🚀 GOOGLE AUTH ROUTE HIT - START OF PROCESS 🚀');
+  // console.log('Time:', new Date().toISOString());
+  // console.log('Request Body:', req.body);
+  // console.log('================================================');
+  
   try {
     const { token } = req.body;
     
-    const ticket = await client.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
+    // Validate token
+    if (!token) {
+      console.log('❌ ERROR: No token in request body');
+      console.log('Request body received:', req.body);
+      return res.status(400).json({ message: 'Token is required' });
+    }
     
-    const payload = ticket.getPayload();
-    const googleId = payload['sub'];
-    const email = payload['email'];
-    const name = payload['name'];
+    // console.log('✓ Token validation passed');
+    // console.log('Token length:', token.length);
+    // console.log('Token preview:', token.substring(0, 20) + '...');
+    
+    // console.log('⏳ Verifying token with Google...');
+    // console.log('Using Client ID:', process.env.GOOGLE_CLIENT_ID);
 
-    console.log('Google auth payload:', { googleId, email, name });
-
-    console.log('Checking for existing admin with email:', email);
-    // First check if this email is designated as an admin
-    const [adminCheck] = await db.query(
-      'SELECT * FROM users WHERE email = ? AND role = ?',
-      [email, 'admin']
-    );
-
-    // Check if user exists
-    let [user] = await db.query(
-      'SELECT * FROM users WHERE google_id = ? OR email = ?',
-      [googleId, email]
-    );
-
-    if (user.length === 0) {
-      // Create new user
-      console.log('Creating new user with Google auth');
-      const role = adminCheck.length > 0 ? 'admin' : 'user';
-      console.log('Assigning role:', role);
-      
-      const [result] = await db.query(
-        'INSERT INTO users (username, email, google_id, google_email, role, isVerified) VALUES (?, ?, ?, ?, ?, true)',
-        [name, email, googleId, email, role]
-      );
-      [user] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-    } else {
-      // If user exists but is marked as admin in adminCheck, update their role
-      if (adminCheck.length > 0 && user[0].role !== 'admin') {
-        console.log('Updating existing user to admin role');
-        await db.query(
-          'UPDATE users SET role = ? WHERE id = ?',
-          ['admin', user[0].id]
-        );
-        user[0].role = 'admin';
-      }
-      console.log('Existing user found:', { 
-        id: user[0].id, 
-        email: user[0].email, 
-        role: user[0].role,
-        hasGoogleId: !!user[0].google_id 
+    let googleId, email, name;
+    
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID
       });
-      
-      // Update existing user's Google info if not set
-      if (!user[0].google_id) {
-        console.log('Updating existing user with Google info');
-        await db.query(
-          'UPDATE users SET google_id = ?, google_email = ?, isVerified = true WHERE id = ?',
-          [googleId, email, user[0].id]
-        );
-      }
+      // console.log('✓ Token verified with Google successfully');
 
-      // Refresh user data after potential update
-      [user] = await db.query('SELECT * FROM users WHERE id = ?', [user[0].id]);
+      const payload = ticket.getPayload();
+      // console.log('📦 Full Google payload received:', payload);
+      
+      googleId = payload['sub'];
+      email = payload['email'];
+      name = payload['name'];
+      // console.log('👤 Extracted user info:', { googleId, email, name });
+    } catch (verifyError) {
+      // console.log('❌ Google verification failed');
+      // console.log('Error details:', verifyError);
+      // console.log('Error message:', verifyError.message);
+      // console.log('Error stack:', verifyError.stack);
+      return res.status(401).json({ 
+        message: 'Failed to verify Google token',
+        error: verifyError.message 
+      });
     }
 
-    // Check if user is blocked
+    // console.log('🔍 Looking up user in database...');
+    // console.log('Search criteria:', { googleId, email });
+    
+    let user;
+    try {
+      [user] = await db.query(
+        'SELECT * FROM users WHERE google_id = ? OR email = ?',
+        [googleId, email]
+      );
+      // console.log('Database query successful');
+      // console.log('Results found:', user.length);
+    } catch (dbError) {
+      console.log('❌ Database lookup failed');
+      console.log('Error:', dbError.message);
+      throw dbError;
+    }
+
+    if (user.length === 0) {
+      // console.log('\n📝 New User Registration Process:');
+      // console.log('├─ Creating new user account');
+      // console.log('├─ Email:', email);
+      // console.log('└─ Name:', name);
+      
+      try {
+        const [result] = await db.query(
+          'INSERT INTO users (username, email, google_id, google_email, role, isVerified) VALUES (?, ?, ?, ?, ?, true)',
+          [name, email, googleId, email, 'user']
+        );
+        console.log('✓ Insert successful, new user ID:', result.insertId);
+        
+        [user] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+        console.log('✓ User data retrieved');
+      } catch (createError) {
+        console.log('❌ Failed to create new user');
+        console.log('Error:', createError.message);
+        throw createError;
+      }
+    } else {
+      // console.log('\n👤 Existing User Processing:');
+      // console.log('├─ User found:', user[0].email);
+      // console.log('└─ ID:', user[0].id);
+      
+      if (!user[0].google_id) {
+        // console.log('\n🔄 Linking Google Account:');
+        // console.log('├─ Updating user:', user[0].id);
+        // console.log('└─ Adding Google credentials');
+        
+        try {
+          await db.query(
+            'UPDATE users SET google_id = ?, google_email = ?, isVerified = true WHERE id = ?',
+            [googleId, email, user[0].id]
+          );
+          console.log('✓ Google account linked successfully');
+          
+          [user] = await db.query('SELECT * FROM users WHERE id = ?', [user[0].id]);
+          console.log('✓ Updated user data retrieved');
+        } catch (updateError) {
+          console.log('❌ Failed to link Google account');
+          console.log('Error:', updateError.message);
+          throw updateError;
+        }
+      }
+    }
+
     if (user[0].isBlocked) {
-      console.log('Blocked user attempted login:', user[0].email);
+      // console.log('🚫 Blocked user attempted login:', email);
       return res.status(403).json({ 
         message: 'Your account has been blocked. Please contact support.',
         error: 'Account blocked'
       });
     }
 
-    // Update login tracking
-    await db.query(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP, login_count = login_count + 1 WHERE id = ?',
-      [user[0].id]
-    );
-
-    // Verify email domain for admin users
-    if (user[0].role === 'admin') {
-      const emailDomain = email.split('@')[1];
-      const allowedDomains = ['gmail.com', 'example.com']; // Add your allowed domains
-      if (!allowedDomains.includes(emailDomain)) {
-        console.log('Unauthorized domain for admin login:', emailDomain);
-        return res.status(403).json({
-          message: 'Unauthorized email domain for admin access',
-          error: 'Invalid domain'
-        });
-      }
+    // console.log('\n📝 Updating Login Stats:');
+    try {
+      await db.query(
+        'UPDATE users SET last_login = CURRENT_TIMESTAMP, login_count = login_count + 1 WHERE id = ?',
+        [user[0].id]
+      );
+      // console.log('✓ Login timestamp updated');
+      // console.log('├─ User ID:', user[0].id);
+      // console.log('└─ Time:', new Date().toISOString());
+    } catch (updateError) {
+      console.log('⚠️ Failed to update login stats');
+      console.log('Error:', updateError.message);
+      // Continue despite this error as it's not critical
     }
 
-    console.log('Generating JWT for user:', { 
-      id: user[0].id, 
-      role: user[0].role 
-    });
+    // console.log('\n🔑 Generating Authentication Token:');
+    // console.log('├─ User ID:', user[0].id);
+    // console.log('├─ Role:', user[0].role);
+    // console.log('└─ Email:', user[0].email);
 
-    // Generate JWT token with short expiration
-    const jwtToken = jwt.sign(
-      { 
-        id: user[0].id, 
-        role: user[0].role,
-        email: user[0].email,
-        iat: Math.floor(Date.now() / 1000)
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    let jwtToken;
+    try {
+      jwtToken = jwt.sign(
+        { id: user[0].id, role: user[0].role, email: user[0].email },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+      // console.log('✓ JWT generated successfully');
+    } catch (jwtError) {
+      console.log('❌ JWT generation failed');
+      console.log('Error:', jwtError.message);
+      throw jwtError;
+    }
 
-    res.cookie('token', jwtToken, {
-      httpOnly: false, // Allow JavaScript access for Socket.IO
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }).json({
-      message: 'Google authentication successful',
-      user: {
-        id: user[0].id,
-        username: user[0].username,
-        email: user[0].email,
-        role: user[0].role
-      }
-    });
+    // console.log('\n🍪 Setting Authentication Cookie:');
+    // console.log('├─ HTTP Only:', false);
+    // console.log('├─ Secure:', process.env.NODE_ENV === 'production');
+    // console.log('└─ Max Age: 24h');
+
+    try {
+      res.cookie('token', jwtToken, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: 24 * 60 * 60 * 1000
+      }).json({
+        message: 'Google authentication successful',
+        user: {
+          id: user[0].id,
+          username: user[0].username,
+          email: user[0].email,
+          role: user[0].role
+        }
+      });
+      // console.log('\n✅ Authentication Complete:');
+      // console.log('├─ Status: Success');
+      // console.log('└─ User:', user[0].email);
+      // console.log('================================================');
+    } catch (responseError) {
+      console.log('❌ Failed to send response');
+      console.log('Error:', responseError.message);
+      throw responseError;
+    }
   } catch (error) {
-    console.error('Google authentication error:', error);
-    res.status(500).json({ message: 'Failed to authenticate with Google' });
+    console.log('\n❌ AUTHENTICATION ERROR ❌');
+    console.log('├─ Time:', new Date().toISOString());
+    console.log('├─ Type:', error.name || 'Unknown Error');
+    console.log('├─ Message:', error.message);
+    console.log('├─ Stack:', error.stack);
+    if (error.code) console.log('├─ Error Code:', error.code);
+    if (error.response) console.log('└─ Response:', error.response.data);
+    else console.log('└─ No additional error data available');
+    console.log('================================================');
+
+    // Send appropriate error response
+    const errorResponse = {
+      message: 'Failed to authenticate with Google',
+      error: error.message,
+      type: error.name || 'Unknown Error'
+    };
+
+    // Use appropriate status code based on error type
+    const statusCode = error.code === 'ECONNREFUSED' ? 503 : // Service unavailable
+                      error.name === 'JsonWebTokenError' ? 401 : // Unauthorized
+                      error.name === 'TokenExpiredError' ? 401 : // Unauthorized
+                      500; // Internal server error (default)
+
+    res.status(statusCode).json(errorResponse);
   }
 });
 

@@ -737,69 +737,69 @@ app.delete('/api/motors/:id', verifyToken, async (req, res) => {
 });
 
 // Google OAuth routes
-app.post('/api/auth/google', async (req, res) => {
-  try {
-    const { token } = req.body;
-    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// app.post('/api/auth/google', async (req, res) => {
+//   try {
+//     const { token } = req.body;
+//     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     
-    const ticket = await client.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
+//     const ticket = await client.verifyIdToken({
+//       idToken: token,
+//       audience: process.env.GOOGLE_CLIENT_ID
+//     });
     
-    const payload = ticket.getPayload();
-    const googleId = payload['sub'];
-    const email = payload['email'];
-    const name = payload['name'];
+//     const payload = ticket.getPayload();
+//     const googleId = payload['sub'];
+//     const email = payload['email'];
+//     const name = payload['name'];
 
-    // Check if user exists
-    let [user] = await db.query(
-      'SELECT * FROM users WHERE google_id = ? OR email = ?',
-      [googleId, email]
-    );
+//     // Check if user exists
+//     let [user] = await db.query(
+//       'SELECT * FROM users WHERE google_id = ? OR email = ?',
+//       [googleId, email]
+//     );
 
-    if (user.length === 0) {
-      // Create new user
-      const [result] = await db.query(
-        'INSERT INTO users (username, email, google_id, google_email, role) VALUES (?, ?, ?, ?, ?)',
-        [name, email, googleId, email, 'user']
-      );
-      [user] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-    } else {
-      // Update existing user's Google info if not set
-      if (!user[0].google_id) {
-        await db.query(
-          'UPDATE users SET google_id = ?, google_email = ? WHERE id = ?',
-          [googleId, email, user[0].id]
-        );
-      }
-    }
+//     if (user.length === 0) {
+//       // Create new user
+//       const [result] = await db.query(
+//         'INSERT INTO users (username, email, google_id, google_email, role) VALUES (?, ?, ?, ?, ?)',
+//         [name, email, googleId, email, 'user']
+//       );
+//       [user] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+//     } else {
+//       // Update existing user's Google info if not set
+//       if (!user[0].google_id) {
+//         await db.query(
+//           'UPDATE users SET google_id = ?, google_email = ? WHERE id = ?',
+//           [googleId, email, user[0].id]
+//         );
+//       }
+//     }
 
-    // Generate JWT token
-    const jwtToken = jwt.sign(
-      { id: user[0].id, role: user[0].role },
-      process.env.JWT_SECRET
-    );
+//     // Generate JWT token
+//     const jwtToken = jwt.sign(
+//       { id: user[0].id, role: user[0].role },
+//       process.env.JWT_SECRET
+//     );
 
-    res.cookie('token', jwtToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }).json({
-      message: 'Google authentication successful',
-      user: {
-        id: user[0].id,
-        username: user[0].username,
-        email: user[0].email,
-        role: user[0].role
-      }
-    });
-  } catch (error) {
-    console.error('Google authentication error:', error);
-    res.status(500).json({ message: 'Failed to authenticate with Google' });
-  }
-});
+//     res.cookie('token', jwtToken, {
+//       httpOnly: true,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: 'Strict',
+//       maxAge: 24 * 60 * 60 * 1000 // 24 hours
+//     }).json({
+//       message: 'Google authentication successful',
+//       user: {
+//         id: user[0].id,
+//         username: user[0].username,
+//         email: user[0].email,
+//         role: user[0].role
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Google authentication error:', error);
+//     res.status(500).json({ message: 'Failed to authenticate with Google' });
+//   }
+// });
 
 // Initialize socket service
 const { initializeSocket } = require('./utils/socketService');
