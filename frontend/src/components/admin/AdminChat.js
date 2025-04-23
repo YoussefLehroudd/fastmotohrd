@@ -17,6 +17,8 @@ import { styled } from '@mui/material/styles';
 import SendIcon from '@mui/icons-material/Send';
 import PersonIcon from '@mui/icons-material/Person';
 import StorefrontIcon from '@mui/icons-material/Storefront';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import io from 'socket.io-client';
 import { useUser } from '../../context/UserContext';
 
@@ -46,15 +48,34 @@ const MessageContainer = styled(Box)({
   flexDirection: 'column'
 });
 
+const MessageWrapper = styled(Box)({
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'flex-start',
+  marginBottom: 8,
+  '&:hover .delete-button': {
+    opacity: 1
+  }
+});
+
 const Message = styled(Box)(({ theme, isOwn }) => ({
   maxWidth: '70%',
   padding: '8px 12px',
   borderRadius: 12,
-  marginBottom: 8,
   wordWrap: 'break-word',
   alignSelf: isOwn ? 'flex-end' : 'flex-start',
   backgroundColor: isOwn ? theme.palette.primary.main : theme.palette.grey[200],
   color: isOwn ? theme.palette.primary.contrastText : theme.palette.text.primary,
+}));
+
+const DeleteButton = styled(IconButton)(({ theme }) => ({
+  padding: 4,
+  opacity: 0,
+  transition: 'opacity 0.2s',
+  marginLeft: 8,
+  '& svg': {
+    fontSize: '1rem'
+  }
 }));
 
 const AdminChat = () => {
@@ -159,6 +180,30 @@ const AdminChat = () => {
 
     newSocket.on('typing_status', ({ roomId, isTyping: typing }) => {
       setIsTyping(prev => ({ ...prev, [roomId]: typing }));
+    });
+
+    newSocket.on('message_deleted', ({ messageId, roomId }) => {
+      setRooms(prevRooms => {
+        const roomIndex = prevRooms.findIndex(r => r.id === roomId);
+        if (roomIndex === -1) return prevRooms;
+
+        const updatedRooms = [...prevRooms];
+        const room = updatedRooms[roomIndex];
+        
+        updatedRooms[roomIndex] = {
+          ...room,
+          messages: room.messages.filter(msg => msg.id !== messageId)
+        };
+
+        return updatedRooms;
+      });
+    });
+
+    newSocket.on('conversation_deleted', ({ roomId }) => {
+      setRooms(prevRooms => prevRooms.filter(r => r.id !== roomId));
+      if (selectedRoom?.id === roomId) {
+        setSelectedRoom(null);
+      }
     });
 
     setSocket(newSocket);
@@ -277,26 +322,64 @@ const AdminChat = () => {
         <ChatBox elevation={3}>
           {selectedRoom ? (
             <>
-              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                <Typography variant="h6">
-                  {selectedRoom.user_name || selectedRoom.user_email || 'Unknown User'}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  {selectedRoom.user_type}
-                </Typography>
+              <Box sx={{ 
+                p: 2, 
+                borderBottom: 1, 
+                borderColor: 'divider',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <Box>
+                  <Typography variant="h6">
+                    {selectedRoom.user_name || selectedRoom.user_email || 'Unknown User'}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    {selectedRoom.user_type}
+                  </Typography>
+                </Box>
+                <IconButton 
+                  color="error" 
+                  onClick={() => {
+                    if (window.confirm('Delete entire conversation? This cannot be undone.')) {
+                      socket.emit('delete_conversation', { roomId: selectedRoom.id });
+                      setSelectedRoom(null);
+                    }
+                  }}
+                >
+                  <DeleteIcon />
+                </IconButton>
               </Box>
 
               <MessageContainer>
                 {selectedRoom.messages?.map((msg, index) => (
-                  <Message
+                  <MessageWrapper
                     key={index}
-                    isOwn={msg.sender_id === user.id}
+                    sx={{
+                      justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start'
+                    }}
                   >
-                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                      {msg.sender_name}
-                    </Typography>
-                    {msg.message}
-                  </Message>
+                    <Message isOwn={msg.sender_id === user.id}>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        {msg.sender_name}
+                      </Typography>
+                      {msg.message}
+                    </Message>
+                    <DeleteButton
+                      className="delete-button"
+                      size="small"
+                      onClick={() => {
+                        if (window.confirm('Delete this message?')) {
+                          socket.emit('delete_message', {
+                            messageId: msg.id,
+                            roomId: selectedRoom.id
+                          });
+                        }
+                      }}
+                    >
+                      <DeleteOutlineIcon />
+                    </DeleteButton>
+                  </MessageWrapper>
                 ))}
                 {isTyping[selectedRoom.id] && (
                   <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', ml: 1 }}>

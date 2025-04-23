@@ -106,6 +106,14 @@ const ChatWidget = () => {
             setIsTyping(typing);
           });
 
+          newSocket.on('message_deleted', ({ messageId }) => {
+            setMessages(prev => prev.filter(msg => msg.id !== messageId));
+          });
+
+          newSocket.on('conversation_deleted', () => {
+            setMessages([]);
+          });
+
           newSocket.on('error', (error) => {
             console.error('Socket error:', error);
           });

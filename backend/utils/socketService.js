@@ -3,6 +3,26 @@ const jwt = require('jsonwebtoken');
 const db = require('../db');
 
 let io;
+const connectedUsers = new Map();
+const userStatuses = new Map();
+
+const getUserStatus = (userId) => {
+  return userStatuses.get(userId) || {
+    online: false,
+    lastActive: null
+  };
+};
+
+const updateUserStatus = (userId, isOnline) => {
+  if (!userId) return;
+  
+  const status = {
+    online: isOnline,
+    lastActive: isOnline ? null : new Date()
+  };
+  userStatuses.set(userId, status);
+  io.emit('user_status_change', { userId, status });
+};
 
 const initializeSocket = (socketIo) => {
   io = socketIo;
@@ -35,16 +55,30 @@ const initializeSocket = (socketIo) => {
 };
 
 const handleConnection = (socket) => {
-  console.log('User connected:', socket.user.id);
+  const userId = socket.user.id;
+  console.log('User connected:', userId);
+
+  // Store connection and update status
+  connectedUsers.set(userId, socket);
+  updateUserStatus(userId, true);
 
   // Join user's room
-  const userRoom = `user_${socket.user.id}`;
+  const userRoom = `user_${userId}`;
   socket.join(userRoom);
 
   // If admin, join admin room
   if (socket.user.role === 'admin') {
     socket.join('admin_room');
   }
+
+  // Handle status request
+  socket.on('get_user_status', ({ userId: requestedUserId }) => {
+    const status = userStatuses.get(requestedUserId) || {
+      online: false,
+      lastActive: null
+    };
+    socket.emit('user_status_change', { userId: requestedUserId, status });
+  });
 
   // Handle new message
   socket.on('send_message', async (data) => {
@@ -135,8 +169,70 @@ const handleConnection = (socket) => {
     }
   });
 
+  // Handle message deletion
+  socket.on('delete_message', async (data) => {
+    try {
+      const { messageId, roomId } = data;
+      
+      // Verify user is admin
+      if (socket.user.role !== 'admin') {
+        throw new Error('Only admins can delete messages');
+      }
+
+      // Delete message from database
+      await db.query('DELETE FROM chat_messages WHERE id = ?', [messageId]);
+
+      // Notify room participants
+      const [room] = await db.query('SELECT user_id FROM chat_rooms WHERE id = ?', [roomId]);
+      if (room.length > 0) {
+        // Send to specific user's room only
+        if (socket.user.role === 'admin') {
+          io.to(`user_${room[0].user_id}`).emit('message_deleted', { messageId, roomId });
+        }
+        // Always notify admin room
+        io.to('admin_room').emit('message_deleted', { messageId, roomId });
+      }
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      socket.emit('error', { message: 'Failed to delete message' });
+    }
+  });
+
+  // Handle conversation deletion
+  socket.on('delete_conversation', async (data) => {
+    try {
+      const { roomId } = data;
+      
+      // Verify user is admin
+      if (socket.user.role !== 'admin') {
+        throw new Error('Only admins can delete conversations');
+      }
+
+      // Delete all messages from the room
+      await db.query('DELETE FROM chat_messages WHERE room_id = ?', [roomId]);
+      
+      // Get user ID for notification
+      const [room] = await db.query('SELECT user_id FROM chat_rooms WHERE id = ?', [roomId]);
+      
+      if (room.length > 0) {
+        // Send to specific user's room only
+        if (socket.user.role === 'admin') {
+          io.to(`user_${room[0].user_id}`).emit('conversation_deleted', { roomId });
+        }
+        // Always notify admin room
+        io.to('admin_room').emit('conversation_deleted', { roomId });
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      socket.emit('error', { message: 'Failed to delete conversation' });
+    }
+  });
+
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.user.id);
+    const userId = socket.user.id;
+    console.log('User disconnected:', userId);
+    connectedUsers.delete(userId);
+    updateUserStatus(userId, false);
   });
 };
 
@@ -149,5 +245,6 @@ const getIO = () => {
 
 module.exports = {
   initializeSocket,
-  getIO
+  getIO,
+  getUserStatus
 };
