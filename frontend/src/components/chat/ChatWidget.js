@@ -74,10 +74,11 @@ const ChatWidget = () => {
         .then(roomData => {
           console.log('Room created:', roomData);
           setRoom(roomData);
-          if (roomData.messages) {
-            setMessages(roomData.messages);
-            scrollToBottom();
-          }
+          // Initialize messages from room data
+          const initialMessages = roomData.messages || [];
+          setMessages(initialMessages);
+          setUnreadCount(initialMessages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length);
+          scrollToBottom();
           
           // Then connect socket
           const newSocket = io('http://localhost:5000', {
@@ -87,20 +88,31 @@ const ChatWidget = () => {
 
           newSocket.on('connect', () => {
             console.log('Connected to socket');
+            // Request unread messages after connecting
+            if (room?.id) {
+              newSocket.emit('get_unread_messages', { roomId: room.id });
+            }
           });
 
           newSocket.on('connect_error', (error) => {
             console.error('Socket connection error:', error);
           });
 
-          newSocket.on('new_message', (message) => {
-            console.log('New message received:', message);
-            setMessages(prev => [...prev, message]);
-            if (!isOpen) {
-              setUnreadCount(prev => prev + 1);
-            }
-            scrollToBottom();
-          });
+    newSocket.on('new_message', (message) => {
+      console.log('New message received:', message);
+      // Check if message already exists
+      setMessages(prev => {
+        if (prev.some(msg => msg.id === message.id)) {
+          return prev;
+        }
+        return [...prev, message];
+      });
+      // Only increment unread count for admin messages when chat is closed
+      if (!isOpen && message.sender_type === 'admin') {
+        setUnreadCount(prev => prev + 1);
+      }
+      scrollToBottom();
+    });
 
           newSocket.on('typing_status', ({ isTyping: typing }) => {
             setIsTyping(typing);
@@ -112,6 +124,20 @@ const ChatWidget = () => {
 
           newSocket.on('conversation_deleted', () => {
             setMessages([]);
+          });
+
+          newSocket.on('unread_messages', (messages) => {
+            // Only add messages that aren't already in the list
+            setMessages(prev => {
+              const existingIds = new Set(prev.map(msg => msg.id));
+              const newMessages = messages.filter(msg => !existingIds.has(msg.id));
+              return [...prev, ...newMessages];
+            });
+            // Update unread count for admin messages only
+            const unreadAdminMessages = messages.filter(msg => !msg.is_read && msg.sender_type === 'admin');
+            if (!isOpen && unreadAdminMessages.length > 0) {
+              setUnreadCount(unreadAdminMessages.length);
+            }
           });
 
           newSocket.on('error', (error) => {
@@ -175,6 +201,10 @@ const ChatWidget = () => {
     setIsOpen(!isOpen);
     if (!isOpen) {
       setUnreadCount(0);
+      // Mark messages as read when opening chat
+      if (socket && room) {
+        socket.emit('mark_messages_read', { roomId: room.id });
+      }
     }
   };
 

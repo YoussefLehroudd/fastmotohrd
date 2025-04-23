@@ -49,7 +49,7 @@ router.post('/google', async (req, res) => {
     // Validate token
     if (!token) {
       console.log('❌ ERROR: No token in request body');
-      console.log('Request body received:', req.body);
+      // console.log('Request body received:', req.body);
       return res.status(400).json({ message: 'Token is required' });
     }
     
@@ -77,7 +77,7 @@ router.post('/google', async (req, res) => {
       name = payload['name'];
       // console.log('👤 Extracted user info:', { googleId, email, name });
     } catch (verifyError) {
-      // console.log('❌ Google verification failed');
+      console.log('❌ Google verification failed');
       // console.log('Error details:', verifyError);
       // console.log('Error message:', verifyError.message);
       // console.log('Error stack:', verifyError.stack);
@@ -118,7 +118,7 @@ router.post('/google', async (req, res) => {
         console.log('✓ Insert successful, new user ID:', result.insertId);
         
         [user] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-        console.log('✓ User data retrieved');
+        // console.log('✓ User data retrieved');
       } catch (createError) {
         console.log('❌ Failed to create new user');
         console.log('Error:', createError.message);
@@ -224,11 +224,11 @@ router.post('/google', async (req, res) => {
       throw responseError;
     }
   } catch (error) {
-    console.log('\n❌ AUTHENTICATION ERROR ❌');
-    console.log('├─ Time:', new Date().toISOString());
-    console.log('├─ Type:', error.name || 'Unknown Error');
-    console.log('├─ Message:', error.message);
-    console.log('├─ Stack:', error.stack);
+    // console.log('\n❌ AUTHENTICATION ERROR ❌');
+    // console.log('├─ Time:', new Date().toISOString());
+    // console.log('├─ Type:', error.name || 'Unknown Error');
+    // console.log('├─ Message:', error.message);
+    // console.log('├─ Stack:', error.stack);
     if (error.code) console.log('├─ Error Code:', error.code);
     if (error.response) console.log('└─ Response:', error.response.data);
     else console.log('└─ No additional error data available');

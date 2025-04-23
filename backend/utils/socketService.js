@@ -54,7 +54,7 @@ const initializeSocket = (socketIo) => {
   io.on('connection', handleConnection);
 };
 
-const handleConnection = (socket) => {
+const handleConnection = async (socket) => {
   const userId = socket.user.id;
   console.log('User connected:', userId);
 
@@ -66,10 +66,49 @@ const handleConnection = (socket) => {
   const userRoom = `user_${userId}`;
   socket.join(userRoom);
 
-  // If admin, join admin room
+  // Join admin room if admin
   if (socket.user.role === 'admin') {
     socket.join('admin_room');
   }
+
+  // Handle marking messages as read
+  socket.on('mark_messages_read', async (data) => {
+    try {
+      const { roomId } = data;
+      const userId = socket.user.id;
+      const userType = socket.user.role;
+
+      // Update messages as read based on user type
+      if (userType === 'admin') {
+        await db.query(
+          'UPDATE chat_messages SET is_read = true WHERE room_id = ? AND sender_type != ?',
+          [roomId, 'admin']
+        );
+      } else {
+        await db.query(
+          'UPDATE chat_messages SET is_read = true WHERE room_id = ? AND sender_type = ?',
+          [roomId, 'admin']
+        );
+      }
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  });
+
+  // Handle unread messages request
+  socket.on('get_unread_messages', async ({ roomId }) => {
+    try {
+      const [messages] = await db.query(
+        'SELECT m.*, u.username as sender_name FROM chat_messages m JOIN users u ON m.sender_id = u.id WHERE m.room_id = ? AND m.is_read = false ORDER BY m.created_at ASC',
+        [roomId]
+      );
+      if (messages.length > 0) {
+        socket.emit('unread_messages', messages);
+      }
+    } catch (error) {
+      console.error('Error fetching unread messages:', error);
+    }
+  });
 
   // Handle status request
   socket.on('get_user_status', ({ userId: requestedUserId }) => {
@@ -121,16 +160,33 @@ const handleConnection = (socket) => {
       );
 
       if (room.length > 0) {
-        // Emit to room participants
         if (userType === 'admin') {
-          // Admin message goes to the user/seller
-          io.to(`user_${room[0].user_id}`).emit('new_message', messageData);
+          // Admin message goes to user/seller as unread and shows in admin's view
+          await db.query(
+            'UPDATE chat_messages SET is_read = false WHERE id = ?',
+            [result.insertId]
+          );
+          // Send to user/seller
+          io.to(`user_${room[0].user_id}`).emit('new_message', {
+            ...messageData,
+            is_read: false
+          });
+          // Show in admin's view as read
+          socket.emit('new_message', {
+            ...messageData,
+            is_read: true
+          });
         } else {
-          // User/seller message goes to admin room
-          io.to('admin_room').emit('new_message', messageData);
+          // User/seller message goes to admin room and shows in sender's view
+          await db.query(
+            'UPDATE chat_messages SET is_read = false WHERE id = ?',
+            [result.insertId]
+          );
+          // Send to all admins except sender
+          socket.to('admin_room').emit('new_message', messageData);
+          // Show in sender's view
+          socket.emit('new_message', messageData);
         }
-        // Also emit to sender
-        socket.emit('new_message', messageData);
 
         // Update room timestamp
         await db.query(

@@ -68,7 +68,7 @@ const Message = styled(Box)(({ theme, isOwn }) => ({
   color: isOwn ? theme.palette.primary.contrastText : theme.palette.text.primary,
 }));
 
-const DeleteButton = styled(IconButton)(({ theme }) => ({
+const DeleteButton = styled(IconButton)({
   padding: 4,
   opacity: 0,
   transition: 'opacity 0.2s',
@@ -76,7 +76,7 @@ const DeleteButton = styled(IconButton)(({ theme }) => ({
   '& svg': {
     fontSize: '1rem'
   }
-}));
+});
 
 const AdminChat = () => {
   const { user } = useUser();
@@ -87,6 +87,7 @@ const AdminChat = () => {
   const [loading, setLoading] = useState(true);
   const [isTyping, setIsTyping] = useState({});
   const messagesEndRef = useRef(null);
+  const selectedRoomRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -95,31 +96,24 @@ const AdminChat = () => {
   const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
+    selectedRoomRef.current = selectedRoom;
+  }, [selectedRoom]);
+
+  useEffect(() => {
     if (!user || user.role !== 'admin') return;
 
-    // Connect socket first
     const newSocket = io('http://localhost:5000', {
       withCredentials: true,
       transports: ['websocket']
     });
 
     newSocket.on('connect', () => {
-      console.log('Admin connected to socket');
-      
-      // Fetch chat rooms after successful socket connection
       fetch('http://localhost:5000/api/chat/history', {
         method: 'GET',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' }
       })
-        .then(res => {
-          if (!res.ok) {
-            throw new Error('Failed to fetch chat history');
-          }
-          return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
           setRooms(data);
           setLoading(false);
@@ -130,50 +124,31 @@ const AdminChat = () => {
         });
     });
 
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
-    });
-
     newSocket.on('new_message', (message) => {
       setRooms(prevRooms => {
-        // Find the room
         const roomIndex = prevRooms.findIndex(r => r.id === message.room_id);
-        
-        if (roomIndex === -1) {
-          // If room doesn't exist, fetch all rooms again
-          fetch('http://localhost:5000/api/chat/history', {
-            method: 'GET',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          })
-            .then(res => res.json())
-            .then(data => {
-              setRooms(data);
-            })
-            .catch(error => {
-              console.error('Error fetching updated rooms:', error);
-            });
-          return prevRooms;
-        }
 
-        // Update existing room
+        if (roomIndex === -1) return prevRooms;
+
         const updatedRooms = [...prevRooms];
         const room = updatedRooms[roomIndex];
-        
+
+        const isCurrentRoomSelected = selectedRoomRef.current?.id === message.room_id;
+        const shouldIncrementUnread = message.sender_type === room.user_type && !isCurrentRoomSelected;
+
+        const unreadCount = shouldIncrementUnread ? (room.unreadCount || 0) + 1 : 0;
+
         updatedRooms[roomIndex] = {
           ...room,
           messages: [...(room.messages || []), message],
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          unreadCount
         };
 
-        // If this is the selected room, scroll to bottom
-        if (selectedRoom?.id === message.room_id) {
+        if (isCurrentRoomSelected) {
           setTimeout(scrollToBottom, 100);
         }
 
-        // Sort rooms by latest message
         return updatedRooms.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
       });
     });
@@ -188,11 +163,9 @@ const AdminChat = () => {
         if (roomIndex === -1) return prevRooms;
 
         const updatedRooms = [...prevRooms];
-        const room = updatedRooms[roomIndex];
-        
         updatedRooms[roomIndex] = {
-          ...room,
-          messages: room.messages.filter(msg => msg.id !== messageId)
+          ...updatedRooms[roomIndex],
+          messages: updatedRooms[roomIndex].messages.filter(msg => msg.id !== messageId)
         };
 
         return updatedRooms;
@@ -201,32 +174,26 @@ const AdminChat = () => {
 
     newSocket.on('conversation_deleted', ({ roomId }) => {
       setRooms(prevRooms => prevRooms.filter(r => r.id !== roomId));
-      if (selectedRoom?.id === roomId) {
+      if (selectedRoomRef.current?.id === roomId) {
         setSelectedRoom(null);
       }
     });
 
     setSocket(newSocket);
 
-    return () => {
-      if (newSocket) {
-        newSocket.close();
-      }
-    };
+    return () => newSocket.close();
   }, [user]);
 
-  // Scroll to bottom when messages change or room is selected
   useEffect(() => {
     if (selectedRoom?.messages?.length > 0) {
       scrollToBottom();
     }
   }, [selectedRoom?.messages, selectedRoom]);
 
-  // Update selected room when rooms change
   useEffect(() => {
     if (selectedRoom) {
       const updatedRoom = rooms.find(room => room.id === selectedRoom.id);
-      if (updatedRoom && JSON.stringify(updatedRoom) !== JSON.stringify(selectedRoom)) {
+      if (updatedRoom && JSON.stringify(updatedRoom.messages) !== JSON.stringify(selectedRoom.messages)) {
         setSelectedRoom(updatedRoom);
       }
     }
@@ -234,22 +201,14 @@ const AdminChat = () => {
 
   const handleTyping = (e) => {
     setMessage(e.target.value);
-    
-    if (socket && selectedRoom) {
-      socket.emit('typing', {
-        roomId: selectedRoom.id,
-        isTyping: true
-      });
 
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
+    if (socket && selectedRoom) {
+      socket.emit('typing', { roomId: selectedRoom.id, isTyping: true });
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
       typingTimeoutRef.current = setTimeout(() => {
-        socket.emit('typing', {
-          roomId: selectedRoom.id,
-          isTyping: false
-        });
+        socket.emit('typing', { roomId: selectedRoom.id, isTyping: false });
       }, 1000);
     }
   };
@@ -264,14 +223,10 @@ const AdminChat = () => {
     });
 
     setMessage('');
-    
-    // Clear typing indicator when sending message
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
-      socket.emit('typing', {
-        roomId: selectedRoom.id,
-        isTyping: false
-      });
+      socket.emit('typing', { roomId: selectedRoom.id, isTyping: false });
     }
   };
 
@@ -303,7 +258,11 @@ const AdminChat = () => {
                 button
                 key={room.id}
                 selected={selectedRoom?.id === room.id}
-                onClick={() => setSelectedRoom(room)}
+                onClick={() => {
+                  setRooms(prev => prev.map(r => r.id === room.id ? { ...r, unreadCount: 0 } : r));
+                  setSelectedRoom(room);
+                }}
+                sx={{ position: 'relative' }}
               >
                 <ListItemAvatar>
                   <Avatar>
@@ -312,8 +271,33 @@ const AdminChat = () => {
                 </ListItemAvatar>
                 <ListItemText
                   primary={room.user_name || room.user_email || 'Unknown User'}
-                  secondary={`${room.user_type} • ${new Date(room.updated_at).toLocaleDateString()}`}
+                  secondary={
+                    <>
+                      {`${room.user_type} • ${new Date(room.updated_at).toLocaleDateString()}`}
+                      <br />
+                      {`Messages received: ${room.messages?.filter(m => m.sender_type === room.user_type).length || 0}`}
+                    </>
+                  }
                 />
+                {room.unreadCount > 0 && (
+                  <Box sx={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    bgcolor: 'error.main',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: 24,
+                    height: 24,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem'
+                  }}>
+                    {room.unreadCount}
+                  </Box>
+                )}
               </ListItem>
             ))}
           </List>
@@ -322,43 +306,28 @@ const AdminChat = () => {
         <ChatBox elevation={3}>
           {selectedRoom ? (
             <>
-              <Box sx={{ 
-                p: 2, 
-                borderBottom: 1, 
-                borderColor: 'divider',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}>
+              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
                   <Typography variant="h6">
                     {selectedRoom.user_name || selectedRoom.user_email || 'Unknown User'}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    {selectedRoom.user_type}
+                    {selectedRoom.user_type} • {selectedRoom.messages?.filter(m => m.sender_type === selectedRoom.user_type).length || 0} messages received
                   </Typography>
                 </Box>
-                <IconButton 
-                  color="error" 
-                  onClick={() => {
-                    if (window.confirm('Delete entire conversation? This cannot be undone.')) {
-                      socket.emit('delete_conversation', { roomId: selectedRoom.id });
-                      setSelectedRoom(null);
-                    }
-                  }}
-                >
+                <IconButton color="error" onClick={() => {
+                  if (window.confirm('Delete entire conversation?')) {
+                    socket.emit('delete_conversation', { roomId: selectedRoom.id });
+                    setSelectedRoom(null);
+                  }
+                }}>
                   <DeleteIcon />
                 </IconButton>
               </Box>
 
               <MessageContainer>
                 {selectedRoom.messages?.map((msg, index) => (
-                  <MessageWrapper
-                    key={index}
-                    sx={{
-                      justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start'
-                    }}
-                  >
+                  <MessageWrapper key={index} sx={{ justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start' }}>
                     <Message isOwn={msg.sender_id === user.id}>
                       <Typography variant="body2" color="textSecondary" gutterBottom>
                         {msg.sender_name}
@@ -389,17 +358,7 @@ const AdminChat = () => {
                 <div ref={messagesEndRef} />
               </MessageContainer>
 
-              <Box
-                component="form"
-                onSubmit={handleSend}
-                sx={{
-                  p: 2,
-                  borderTop: 1,
-                  borderColor: 'divider',
-                  display: 'flex',
-                  gap: 1
-                }}
-              >
+              <Box component="form" onSubmit={handleSend} sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
                 <TextField
                   fullWidth
                   size="small"
@@ -413,15 +372,8 @@ const AdminChat = () => {
               </Box>
             </>
           ) : (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              height="100%"
-            >
-              <Typography color="textSecondary">
-                Select a chat to start messaging
-              </Typography>
+            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+              <Typography color="textSecondary">Select a chat to start messaging</Typography>
             </Box>
           )}
         </ChatBox>

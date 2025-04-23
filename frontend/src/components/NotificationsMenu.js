@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import {
   IconButton,
   Badge,
@@ -33,23 +34,71 @@ const NotificationsMenu = () => {
   const [selectedNotifications, setSelectedNotifications] = useState([]);
   const [selectionMode, setSelectionMode] = useState(false);
 
+  // Create audio context for notification sound
+  const [audio] = useState(() => {
+    const oscillator = new (window.AudioContext || window.webkitAudioContext)();
+    return oscillator;
+  });
+
+  const playNotificationSound = () => {
+    const oscillator = audio.createOscillator();
+    const gainNode = audio.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audio.destination);
+    
+    // Configure sound
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(440, audio.currentTime); // A4 note
+    gainNode.gain.setValueAtTime(0.1, audio.currentTime); // Lower volume
+    
+    // Start and stop the sound
+    oscillator.start();
+    oscillator.stop(audio.currentTime + 0.1); // Short duration
+  };
+
   useEffect(() => {
     fetchNotifications();
 
-    // Connect to WebSocket
-    const token = document.cookie.split('=')[1];
-    const ws = new WebSocket(`ws://localhost:5000?token=${token}`);
+    // Connect to Socket.IO
+    const socket = io('http://localhost:5000', {
+      withCredentials: true
+    });
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.type === 'notification') {
-        setNotifications(prev => [data.data, ...prev]);
-        setUnreadCount(prev => prev + 1);
+    socket.on('connect', () => {
+      console.log('Connected to notification service');
+    });
+
+    socket.on('notification', (data) => {
+      // Update notifications list
+      setNotifications(prev => [data, ...prev]);
+      setUnreadCount(prev => prev + 1);
+      
+      // Play notification sound
+      playNotificationSound();
+      
+      // Show browser notification
+      if (Notification.permission === "granted") {
+        new Notification("New Notification", {
+          body: data.content,
+          icon: "/favicon.ico",
+          tag: `notification-${data.id}`, // Prevents duplicate notifications
+          silent: false // Enable sound
+        });
       }
-    };
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    // Request notification permission
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
 
     return () => {
-      ws.close();
+      socket.disconnect();
     };
   }, []);
 
