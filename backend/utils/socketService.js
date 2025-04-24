@@ -79,10 +79,10 @@ const handleConnection = async (socket) => {
       const userType = socket.user.role;
 
       if (userType === 'admin') {
-        // Mark seller messages as read
+        // Mark user/seller messages as read
         await db.query(
-          'UPDATE chat_messages SET is_read = true WHERE room_id = ? AND sender_type = ?',
-          [roomId, 'seller']
+          'UPDATE chat_messages SET is_read = true WHERE room_id = ? AND sender_type IN (?, ?)',
+          [roomId, 'user', 'seller']
         );
 
         // Get updated unread count
@@ -90,7 +90,7 @@ const handleConnection = async (socket) => {
           SELECT COUNT(*) as count 
           FROM chat_messages 
           WHERE room_id = ? 
-          AND sender_type = 'seller' 
+          AND sender_type IN ('user', 'seller')
           AND is_read = false
         `, [roomId]);
 
@@ -109,6 +109,12 @@ const handleConnection = async (socket) => {
         await db.query(
           'UPDATE chat_messages SET is_read = true WHERE room_id = ? AND sender_type = ?',
           [roomId, 'admin']
+        );
+
+        // Update unread count in chat_rooms table
+        await db.query(
+          'UPDATE chat_rooms SET unread_count = 0 WHERE id = ?',
+          [roomId]
         );
       }
     } catch (error) {
@@ -151,18 +157,18 @@ const handleConnection = async (socket) => {
       const userId = socket.user.id;
       const userType = socket.user.role;
 
-      // Save message to database and mark as unread
+      // Save message to database and mark as unread for recipient
       const [result] = await db.query(`
         INSERT INTO chat_messages (room_id, sender_id, sender_type, message, is_read)
-        VALUES (?, ?, ?, ?, false)
-      `, [roomId, userId, userType, message]);
+        VALUES (?, ?, ?, ?, ?)
+      `, [roomId, userId, userType, message, userType === 'admin' ? false : true]);
 
-      // Get unread count for this room
+      // Get unread count for this room based on sender type
       const [unreadCount] = await db.query(`
         SELECT COUNT(*) as count
         FROM chat_messages
         WHERE room_id = ?
-        AND sender_type = 'seller'
+        AND sender_type IN ('user', 'seller')
         AND is_read = false
       `, [roomId]);
 
@@ -183,63 +189,81 @@ const handleConnection = async (socket) => {
         is_read: false
       };
 
-      // Get room info to determine recipients
+      // Get room info
       const [room] = await db.query(
         'SELECT user_id, user_type FROM chat_rooms WHERE id = ?',
         [roomId]
       );
 
       if (room.length > 0) {
-      if (userType === 'admin') {
-        // Admin message goes to user/seller as unread and shows in admin's view
+        // Update database
         await Promise.all([
           // Mark message as unread
           db.query(
             'UPDATE chat_messages SET is_read = false WHERE id = ?',
             [result.insertId]
           ),
-          // Increment admin messages count
+          // Update counts based on sender type
+          userType === 'admin' 
+            ? db.query(
+                'UPDATE chat_rooms SET admin_messages_count = COALESCE(admin_messages_count, 0) + 1 WHERE id = ?',
+                [roomId]
+              )
+            : db.query(
+                'UPDATE chat_rooms SET unread_count = COALESCE(unread_count, 0) + 1 WHERE id = ?',
+                [roomId]
+              ),
+          // Update room timestamp
           db.query(
-            'UPDATE chat_rooms SET admin_messages_count = COALESCE(admin_messages_count, 0) + 1 WHERE id = ?',
+            'UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             [roomId]
           )
         ]);
 
-        // Send to user/seller
-        io.to(`user_${room[0].user_id}`).emit('new_message', {
-          ...messageData,
-          is_read: false
-        });
-        // Show in admin's view as read
-        socket.emit('new_message', {
-          ...messageData,
-          is_read: true
-        });
-        } else if (userType === 'seller') {
-          // Seller message goes to admin room and shows in sender's view
-          await Promise.all([
-            // Mark message as unread
-            db.query(
-              'UPDATE chat_messages SET is_read = false WHERE id = ?',
-              [result.insertId]
-            ),
-            // Increment unread count for admin
-            db.query(
-              'UPDATE chat_rooms SET unread_count = COALESCE(unread_count, 0) + 1 WHERE id = ?',
-              [roomId]
-            )
-          ]);
-          // Send to all admins except sender
-          socket.to('admin_room').emit('new_message', messageData);
-          // Show in sender's view
-          socket.emit('new_message', messageData);
-        }
+        // Send message to appropriate rooms
+        if (userType === 'admin') {
+          // Send to user's room (unread)
+          io.to(`user_${room[0].user_id}`).emit('new_message', {
+            ...messageData,
+            is_read: false
+          });
+          // Send to admin room (read)
+          io.to('admin_room').emit('new_message', {
+            ...messageData,
+            is_read: true
+          });
+        } else {
+          // Get updated unread count for admin
+          const [unreadResult] = await db.query(`
+            SELECT COUNT(*) as count 
+            FROM chat_messages 
+            WHERE room_id = ? 
+            AND sender_type IN ('user', 'seller')
+            AND is_read = false
+          `, [roomId]);
 
-        // Update room timestamp
-        await db.query(
-          'UPDATE chat_rooms SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-          [roomId]
-        );
+          // Send to admin room (unread) with updated count
+          io.to('admin_room').emit('new_message', {
+            ...messageData,
+            is_read: false,
+            unread_count: unreadResult[0].count
+          });
+
+          // Also emit unread count update
+          io.to('admin_room').emit('unread_count_updated', {
+            roomId,
+            unreadCount: unreadResult[0].count
+          });
+
+          // Send back to sender (read)
+          socket.emit('new_message', {
+            ...messageData,
+            is_read: true
+          });
+        }
+        
+        // Log for debugging
+        console.log('Message sent:', messageData);
       }
     } catch (error) {
       console.error('Error handling message:', error);

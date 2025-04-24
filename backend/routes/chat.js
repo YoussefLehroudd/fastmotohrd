@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { verifyToken, authenticateAdmin } = require('../middleware/auth');
+const { getIO } = require('../utils/socketService');
 
 // Get chat history for a user
 router.get('/history', verifyToken, async (req, res) => {
@@ -20,7 +21,7 @@ router.get('/history', verifyToken, async (req, res) => {
           (SELECT COUNT(*) 
            FROM chat_messages cm 
            WHERE cm.room_id = cr.id 
-           AND cm.sender_type = 'seller' 
+           AND cm.sender_type IN ('user', 'seller')
            AND cm.is_read = false) as unread_count,
           (SELECT COUNT(*) 
            FROM chat_messages cm 
@@ -29,7 +30,7 @@ router.get('/history', verifyToken, async (req, res) => {
           (SELECT COUNT(*) 
            FROM chat_messages cm 
            WHERE cm.room_id = cr.id 
-           AND cm.sender_type = 'seller') as messages_received
+           AND cm.sender_type IN ('user', 'seller')) as messages_received
         FROM chat_rooms cr
         JOIN users u ON cr.user_id = u.id
         ORDER BY cr.updated_at DESC
@@ -37,9 +38,19 @@ router.get('/history', verifyToken, async (req, res) => {
     } else {
       // Users/sellers see only their own chats
       [rooms] = await db.query(`
-        SELECT * FROM chat_rooms 
-        WHERE user_id = ? AND user_type = ?
-        ORDER BY updated_at DESC
+        SELECT 
+          cr.*,
+          u.username as user_name,
+          u.email as user_email,
+          (SELECT COUNT(*) 
+           FROM chat_messages cm 
+           WHERE cm.room_id = cr.id 
+           AND cm.sender_type = 'admin'
+           AND cm.is_read = false) as unread_count
+        FROM chat_rooms cr
+        JOIN users u ON cr.user_id = u.id
+        WHERE cr.user_id = ? AND cr.user_type = ?
+        ORDER BY cr.updated_at DESC
       `, [userId, userType]);
     }
 
@@ -135,19 +146,40 @@ router.put('/messages/read', verifyToken, async (req, res) => {
     const userType = req.user.role;
 
     if (userType === 'admin') {
-      // Mark seller messages as read
+      // Mark user/seller messages as read
       await db.query(`
         UPDATE chat_messages 
         SET is_read = TRUE
-        WHERE room_id = ? AND sender_type = 'seller'
+        WHERE room_id = ? AND sender_type IN ('user', 'seller')
       `, [roomId]);
     } else {
+      const io = getIO();
+      
       // Mark admin messages as read
       await db.query(`
         UPDATE chat_messages 
         SET is_read = TRUE
         WHERE room_id = ? AND sender_type = 'admin'
       `, [roomId]);
+
+      // Get updated unread count
+      const [unreadResult] = await db.query(`
+        SELECT COUNT(*) as count 
+        FROM chat_messages 
+        WHERE room_id = ? 
+        AND sender_type = 'admin' 
+        AND is_read = false
+      `, [roomId]);
+
+      // Notify admin that messages are read
+      const [room] = await db.query('SELECT user_id FROM chat_rooms WHERE id = ?', [roomId]);
+      if (room.length > 0) {
+        io.to('admin_room').emit('messages_read_by_user', { 
+          roomId,
+          userId: userId,
+          unreadCount: unreadResult[0].count
+        });
+      }
     }
 
     res.json({ message: 'Messages marked as read' });

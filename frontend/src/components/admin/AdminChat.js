@@ -22,6 +22,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import io from 'socket.io-client';
 import { useUser } from '../../context/UserContext';
 
+// Styled components remain the same...
 const ChatContainer = styled(Box)({
   display: 'flex',
   height: 'calc(100vh - 100px)',
@@ -108,6 +109,10 @@ const AdminChat = () => {
     });
 
     newSocket.on('connect', () => {
+      console.log('Socket connected');
+      // Join admin room
+      newSocket.emit('join', { room: 'admin_room' });
+      
       fetch('http://localhost:5000/api/chat/history', {
         method: 'GET',
         credentials: 'include',
@@ -124,10 +129,17 @@ const AdminChat = () => {
         });
     });
 
+    // Debug socket events
+    newSocket.onAny((event, ...args) => {
+      console.log('Socket event:', event, args);
+    });
+
     newSocket.on('new_message', (message) => {
+      // Remove any temporary message if this is our own message
+      const isOwnMessage = message.sender_id === user.id;
+      
       setRooms(prevRooms => {
         const roomIndex = prevRooms.findIndex(r => r.id === message.room_id);
-
         if (roomIndex === -1) return prevRooms;
 
         const updatedRooms = [...prevRooms];
@@ -135,19 +147,35 @@ const AdminChat = () => {
 
         const isCurrentRoomSelected = selectedRoomRef.current?.id === message.room_id;
         
-        // Only increment unread count for seller messages when room is not selected
-        const shouldIncrementUnread = message.sender_type === 'seller' && !isCurrentRoomSelected;
-        const currentUnreadCount = room.unread_count || 0;
-        const newUnreadCount = shouldIncrementUnread ? currentUnreadCount + 1 : currentUnreadCount;
+        // Filter out temporary message if this is our own message
+        const currentMessages = room.messages || [];
+        const filteredMessages = isOwnMessage 
+          ? currentMessages.filter(msg => !msg.id.toString().startsWith('temp-'))
+          : currentMessages;
+
+        // Add the new message
+        const updatedMessages = [...filteredMessages, message];
+
+        // Update unread count if provided in message, otherwise calculate
+        const newUnreadCount = message.unread_count !== undefined 
+          ? message.unread_count 
+          : (message.sender_type !== 'admin' && !isCurrentRoomSelected 
+              ? (room.unread_count || 0) + 1 
+              : room.unread_count || 0);
 
         updatedRooms[roomIndex] = {
           ...room,
-          messages: [...(room.messages || []), message],
+          messages: updatedMessages,
           updated_at: new Date().toISOString(),
           unread_count: newUnreadCount
         };
 
+        // Update selected room if this is the current room
         if (isCurrentRoomSelected) {
+          setSelectedRoom(prev => ({
+            ...prev,
+            messages: updatedMessages
+          }));
           setTimeout(scrollToBottom, 100);
         }
 
@@ -181,6 +209,38 @@ const AdminChat = () => {
       }
     });
 
+    // Handle messages being read by users
+    newSocket.on('messages_read_by_user', ({ roomId, userId }) => {
+      setRooms(prevRooms => {
+        const roomIndex = prevRooms.findIndex(r => r.id === roomId);
+        if (roomIndex === -1) return prevRooms;
+
+        const updatedRooms = [...prevRooms];
+        const room = updatedRooms[roomIndex];
+
+        // Update messages to mark them as read
+        const updatedMessages = room.messages.map(msg => ({
+          ...msg,
+          is_read: msg.sender_type === 'admin' ? true : msg.is_read
+        }));
+
+        updatedRooms[roomIndex] = {
+          ...room,
+          messages: updatedMessages
+        };
+
+        // Update selected room if this is the current room
+        if (selectedRoomRef.current?.id === roomId) {
+          setSelectedRoom(prev => ({
+            ...prev,
+            messages: updatedMessages
+          }));
+        }
+
+        return updatedRooms;
+      });
+    });
+
     setSocket(newSocket);
 
     return () => newSocket.close();
@@ -190,7 +250,7 @@ const AdminChat = () => {
     if (selectedRoom?.messages?.length > 0) {
       scrollToBottom();
     }
-  }, [selectedRoom?.messages, selectedRoom]);
+  }, [selectedRoom?.messages]);
 
   // Listen for unread count updates
   useEffect(() => {
@@ -208,15 +268,6 @@ const AdminChat = () => {
       };
     }
   }, [socket]);
-
-  useEffect(() => {
-    if (selectedRoom) {
-      const updatedRoom = rooms.find(room => room.id === selectedRoom.id);
-      if (updatedRoom && JSON.stringify(updatedRoom.messages) !== JSON.stringify(selectedRoom.messages)) {
-        setSelectedRoom(updatedRoom);
-      }
-    }
-  }, [rooms]);
 
   const handleTyping = (e) => {
     setMessage(e.target.value);
@@ -236,12 +287,32 @@ const AdminChat = () => {
     e.preventDefault();
     if (!message.trim() || !socket || !selectedRoom) return;
 
+    // Create temporary message object for immediate display
+    const tempMessage = {
+      room_id: selectedRoom.id,
+      sender_id: user.id,
+      sender_type: 'admin',
+      sender_name: user.username,
+      message: message.trim(),
+      created_at: new Date().toISOString(),
+      is_read: true,
+      id: 'temp-' + Date.now() // Temporary ID
+    };
+
+    // Update UI immediately
+    setSelectedRoom(prev => ({
+      ...prev,
+      messages: [...(prev.messages || []), tempMessage]
+    }));
+
+    // Send message to server
     socket.emit('send_message', {
       roomId: selectedRoom.id,
       message: message.trim()
     });
 
     setMessage('');
+    scrollToBottom();
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -349,27 +420,29 @@ const AdminChat = () => {
 
               <MessageContainer>
                 {selectedRoom.messages?.map((msg, index) => (
-                  <MessageWrapper key={index} sx={{ justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start' }}>
+                  <MessageWrapper key={msg.id || index} sx={{ justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start' }}>
                     <Message isOwn={msg.sender_id === user.id}>
                       <Typography variant="body2" color="textSecondary" gutterBottom>
                         {msg.sender_name}
                       </Typography>
                       {msg.message}
                     </Message>
-                    <DeleteButton
-                      className="delete-button"
-                      size="small"
-                      onClick={() => {
-                        if (window.confirm('Delete this message?')) {
-                          socket.emit('delete_message', {
-                            messageId: msg.id,
-                            roomId: selectedRoom.id
-                          });
-                        }
-                      }}
-                    >
-                      <DeleteOutlineIcon />
-                    </DeleteButton>
+                    {!msg.id.toString().startsWith('temp-') && (
+                      <DeleteButton
+                        className="delete-button"
+                        size="small"
+                        onClick={() => {
+                          if (window.confirm('Delete this message?')) {
+                            socket.emit('delete_message', {
+                              messageId: msg.id,
+                              roomId: selectedRoom.id
+                            });
+                          }
+                        }}
+                      >
+                        <DeleteOutlineIcon />
+                      </DeleteButton>
+                    )}
                   </MessageWrapper>
                 ))}
                 {isTyping[selectedRoom.id] && (

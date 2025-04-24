@@ -73,13 +73,22 @@ const ChatWidget = () => {
     newSocket.on('new_message', (message) => {
       console.log('New message received:', message);
       setMessages(prev => {
-        if (prev.some(msg => msg.id === message.id)) return prev;
-        const newMessages = [...prev, message];
-        // Only increment unread count if chat is closed and message is unread
-        if (message.sender_type === 'admin' && !isOpen && !message.is_read) {
-          setUnreadCount(prev => prev + 1);
+        // Remove temporary message if this is our own message
+        const isOwnMessage = message.sender_id === user.id;
+        const filteredMessages = isOwnMessage 
+          ? prev.filter(msg => !msg.id.toString().startsWith('temp-'))
+          : prev;
+
+        // Add the new message if it doesn't exist
+        if (!filteredMessages.some(msg => msg.id === message.id)) {
+          const newMessages = [...filteredMessages, message];
+          // Only increment unread count if chat is closed and message is from admin
+          if (message.sender_type === 'admin' && !isOpen && !message.is_read) {
+            setUnreadCount(prev => prev + 1);
+          }
+          return newMessages;
         }
-        return newMessages;
+        return prev;
       });
       if (isOpen) scrollToBottom();
     });
@@ -135,10 +144,29 @@ const ChatWidget = () => {
     if (isOpen && socket && room) {
       // Mark messages as read when opening chat
       socket.emit('mark_messages_read', { roomId: room.id });
+      
+      // Update messages to mark them as read locally
+      setMessages(prevMessages => 
+        prevMessages.map(msg => ({
+          ...msg,
+          is_read: true
+        }))
+      );
+      
       setUnreadCount(0);
       scrollToBottom();
     }
-  }, [isOpen]);
+  }, [isOpen, socket, room]);
+
+  // Also mark messages as read when new messages arrive and chat is open
+  useEffect(() => {
+    if (isOpen && socket && room && messages.length > 0) {
+      const unreadMessages = messages.filter(msg => !msg.is_read && msg.sender_type === 'admin');
+      if (unreadMessages.length > 0) {
+        socket.emit('mark_messages_read', { roomId: room.id });
+      }
+    }
+  }, [messages, isOpen, socket, room]);
 
   // Handle new messages scroll
   useEffect(() => {
@@ -151,12 +179,31 @@ const ChatWidget = () => {
     e.preventDefault();
     if (!message.trim() || !socket || !room) return;
 
+    // Create temporary message for immediate display
+    const tempMessage = {
+      id: 'temp-' + Date.now(),
+      room_id: room.id,
+      sender_id: user.id,
+      sender_type: user.role,
+      sender_name: user.username,
+      message: message.trim(),
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+
+    // Add temporary message to UI
+    setMessages(prev => [...prev, tempMessage]);
+
+    // Send message to server with sender info
     socket.emit('send_message', {
       roomId: room.id,
-      message: message.trim()
+      message: message.trim(),
+      sender_type: user.role,
+      sender_id: user.id
     });
 
     setMessage('');
+    scrollToBottom();
   };
 
   const handleTyping = (e) => {
@@ -218,9 +265,9 @@ const ChatWidget = () => {
           </Box>
 
           <MessageContainer>
-            {messages.map((msg, index) => (
+            {messages.map((msg) => (
               <Message 
-                key={index} 
+                key={msg.id || Date.now() + Math.random()} 
                 isOwn={msg.sender_id === user?.id}
               >
                 <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 0.5 }}>
@@ -268,8 +315,8 @@ const ChatWidget = () => {
         onClick={toggleChat}
       >
         <Badge 
-          badgeContent={isOpen ? 0 : messages.filter(m => m.sender_type === 'admin' && !m.is_read).length}
-          color="primary"
+          badgeContent={unreadCount}
+          color="error"
           sx={{ 
             "& .MuiBadge-badge": {
               fontSize: "0.8rem",
