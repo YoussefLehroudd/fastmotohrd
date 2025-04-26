@@ -101,6 +101,21 @@ const AdminChat = () => {
     // When room is selected and socket exists, mark messages as read
     if (selectedRoom && socket) {
       socket.emit('mark_messages_read', { roomId: selectedRoom.id });
+      // Update room's unread count locally
+      setRooms(prevRooms => 
+        prevRooms.map(room => 
+          room.id === selectedRoom.id ? { ...room, unread_count: 0 } : room
+        )
+      );
+      // Update selected room's messages as read, but only for non-admin messages
+      setSelectedRoom(prev => ({
+        ...prev,
+        unread_count: 0,
+        messages: prev.messages?.map(msg => ({
+          ...msg,
+          admin_read: msg.sender_type !== 'admin' ? true : msg.admin_read
+        }))
+      }));
     }
   }, [selectedRoom, socket]);
 
@@ -124,16 +139,14 @@ const AdminChat = () => {
       })
         .then(res => res.json())
         .then(data => {
-          // If we have a selected room, mark its messages as read
-          if (selectedRoomRef.current) {
-            const roomId = selectedRoomRef.current.id;
-            newSocket.emit('mark_messages_read', { roomId });
-            // Update the room's unread count in the data
-            data = data.map(room => 
-              room.id === roomId ? { ...room, unread_count: 0 } : room
-            );
-          }
-          setRooms(data);
+          // Update unread counts based on message read status
+          const updatedData = data.map(room => {
+            const unreadCount = room.messages?.filter(msg => 
+              msg.sender_type !== 'admin' && !msg.admin_read
+            ).length || 0;
+            return { ...room, unread_count: unreadCount };
+          });
+          setRooms(updatedData);
           setLoading(false);
         })
         .catch(error => {
@@ -204,10 +217,20 @@ const AdminChat = () => {
         if (roomIndex === -1) return prevRooms;
 
         const updatedRooms = [...prevRooms];
+        const updatedMessages = updatedRooms[roomIndex].messages.filter(msg => msg.id !== messageId);
+        
         updatedRooms[roomIndex] = {
           ...updatedRooms[roomIndex],
-          messages: updatedRooms[roomIndex].messages.filter(msg => msg.id !== messageId)
+          messages: updatedMessages
         };
+
+        // Update selected room if this is the current room
+        if (selectedRoomRef.current?.id === roomId) {
+          setSelectedRoom(prev => ({
+            ...prev,
+            messages: updatedMessages
+          }));
+        }
 
         return updatedRooms;
       });
@@ -232,7 +255,9 @@ const AdminChat = () => {
         // Update messages to mark them as read
         const updatedMessages = room.messages.map(msg => ({
           ...msg,
-          is_read: msg.sender_type === 'admin' ? true : msg.is_read
+          admin_read: msg.sender_type === 'admin' ? true : msg.admin_read,
+          seller_read: msg.sender_type === 'seller' ? true : msg.seller_read,
+          user_read: msg.sender_type === 'user' ? true : msg.user_read
         }));
 
         updatedRooms[roomIndex] = {
@@ -306,7 +331,9 @@ const AdminChat = () => {
       sender_name: user.username,
       message: message.trim(),
       created_at: new Date().toISOString(),
-      is_read: true,
+          admin_read: true,
+          seller_read: false,
+          user_read: false,
       id: 'temp-' + Date.now() // Temporary ID
     };
 
@@ -359,13 +386,7 @@ const AdminChat = () => {
                 button
                 key={room.id}
                 selected={selectedRoom?.id === room.id}
-                onClick={() => {
-                  // Mark messages as read when selecting room
-                  if (socket && room.unread_count > 0) {
-                    socket.emit('mark_messages_read', { roomId: room.id });
-                  }
-                  setSelectedRoom(room);
-                }}
+                onClick={() => setSelectedRoom(room)}
                 sx={{ position: 'relative' }}
               >
                 <ListItemAvatar>
@@ -379,7 +400,7 @@ const AdminChat = () => {
                     <>
                       {`${room.user_type} • ${new Date(room.updated_at).toLocaleDateString()}`}
                       <br />
-                      {`Messages received: ${room.messages?.filter(m => m.sender_type === 'seller').length || 0}`}
+                      {`Messages received: ${room.messages?.filter(m => m.sender_type !== 'admin').length || 0}`}
                     </>
                   }
                 />
@@ -416,7 +437,7 @@ const AdminChat = () => {
                     {selectedRoom.user_name || selectedRoom.user_email || 'Unknown User'}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    {selectedRoom.user_type} • {selectedRoom.messages?.filter(m => m.sender_type === 'seller').length || 0} messages received
+                    {selectedRoom.user_type} • {selectedRoom.messages?.filter(m => m.sender_type !== 'admin').length || 0} messages received
                   </Typography>
                 </Box>
                 <IconButton color="error" onClick={() => {

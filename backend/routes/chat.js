@@ -21,8 +21,8 @@ router.get('/history', verifyToken, async (req, res) => {
           (SELECT COUNT(*) 
            FROM chat_messages cm 
            WHERE cm.room_id = cr.id 
-           AND cm.sender_type IN ('user', 'seller')
-           AND cm.is_read = false) as unread_count,
+           AND cm.sender_type != 'admin'
+           AND cm.admin_read = false) as unread_count,
           (SELECT COUNT(*) 
            FROM chat_messages cm 
            WHERE cm.room_id = cr.id 
@@ -30,7 +30,7 @@ router.get('/history', verifyToken, async (req, res) => {
           (SELECT COUNT(*) 
            FROM chat_messages cm 
            WHERE cm.room_id = cr.id 
-           AND cm.sender_type IN ('user', 'seller')) as messages_received
+           AND cm.sender_type != 'admin') as messages_received
         FROM chat_rooms cr
         JOIN users u ON cr.user_id = u.id
         ORDER BY cr.updated_at DESC
@@ -46,7 +46,7 @@ router.get('/history', verifyToken, async (req, res) => {
            FROM chat_messages cm 
            WHERE cm.room_id = cr.id 
            AND cm.sender_type = 'admin'
-           AND cm.is_read = false) as unread_count
+           AND cm.${userType}_read = false) as unread_count
         FROM chat_rooms cr
         JOIN users u ON cr.user_id = u.id
         WHERE cr.user_id = ? AND cr.user_type = ?
@@ -146,19 +146,19 @@ router.put('/messages/read', verifyToken, async (req, res) => {
     const userType = req.user.role;
 
     if (userType === 'admin') {
-      // Mark user/seller messages as read
+      // Mark user/seller messages as read for admin
       await db.query(`
         UPDATE chat_messages 
-        SET is_read = TRUE
-        WHERE room_id = ? AND sender_type IN ('user', 'seller')
+        SET admin_read = TRUE
+        WHERE room_id = ? AND sender_type != 'admin'
       `, [roomId]);
     } else {
       const io = getIO();
       
-      // Mark admin messages as read
+      // Mark admin messages as read for user/seller
       await db.query(`
         UPDATE chat_messages 
-        SET is_read = TRUE
+        SET ${userType}_read = TRUE
         WHERE room_id = ? AND sender_type = 'admin'
       `, [roomId]);
 
@@ -168,7 +168,7 @@ router.put('/messages/read', verifyToken, async (req, res) => {
         FROM chat_messages 
         WHERE room_id = ? 
         AND sender_type = 'admin' 
-        AND is_read = false
+        AND ${userType}_read = false
       `, [roomId]);
 
       // Notify admin that messages are read

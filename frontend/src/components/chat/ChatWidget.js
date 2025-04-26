@@ -38,7 +38,7 @@ const Message = styled(Box)(({ theme, isOwn }) => ({
 }));
 
 const ChatWidget = () => {
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
@@ -55,9 +55,6 @@ const ChatWidget = () => {
   };
 
   useEffect(() => {
-    if (!user || user.role === 'admin') return;
-
-    // Initialize socket
     const newSocket = io('http://localhost:5000', {
       withCredentials: true,
       transports: ['websocket']
@@ -74,20 +71,16 @@ const ChatWidget = () => {
     newSocket.on('new_message', (message) => {
       console.log('New message received:', message);
       setMessages(prev => {
-        // Remove temporary message if this is our own message
-        const isOwnMessage = message.sender_id === user.id;
+        const isOwnMessage = message.sender_id === user?.id;
         const filteredMessages = isOwnMessage 
           ? prev.filter(msg => !msg.id.toString().startsWith('temp-'))
           : prev;
 
-        // Add the new message if it doesn't exist
         if (!filteredMessages.some(msg => msg.id === message.id)) {
           const newMessages = [...filteredMessages, message];
           
-          // Update admin message count
           if (message.sender_type === 'admin') {
             setAdminMessageCount(count => count + 1);
-            // Always mark as unread initially
             message.is_read = false;
           }
           
@@ -105,7 +98,6 @@ const ChatWidget = () => {
     newSocket.on('message_deleted', ({ messageId }) => {
       setMessages(prev => {
         const updatedMessages = prev.filter(msg => msg.id !== messageId);
-        // Update admin message count
         setAdminMessageCount(updatedMessages.filter(m => m.sender_type === 'admin').length);
         return updatedMessages;
       });
@@ -118,19 +110,18 @@ const ChatWidget = () => {
 
     setSocket(newSocket);
 
-    // Listen for admin_messages_read event to reset unread count
     newSocket.on('admin_messages_read', ({ roomId }) => {
       setUnreadCount(0);
-      // Also update messages to mark them as read
       setMessages(prevMessages => 
         prevMessages.map(msg => ({
           ...msg,
-          is_read: true
+          admin_read: false,
+          seller_read: user?.role === 'seller',
+          user_read: user?.role === 'user'
         }))
       );
     });
 
-    // Get initial chat room and messages
     fetch('http://localhost:5000/api/chat/room', {
       method: 'POST',
       credentials: 'include',
@@ -146,9 +137,11 @@ const ChatWidget = () => {
         setRoom(roomData);
         const initialMessages = roomData.messages || [];
         setMessages(initialMessages);
-        // Set initial admin message count
         setAdminMessageCount(initialMessages.filter(m => m.sender_type === 'admin').length);
-        setUnreadCount(initialMessages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length);
+        setUnreadCount(initialMessages.filter(msg => 
+          msg.sender_type === 'admin' && 
+          (user?.role === 'seller' ? !msg.seller_read : !msg.user_read)
+        ).length);
       })
       .catch(error => {
         console.error('Chat initialization error:', error);
@@ -159,17 +152,16 @@ const ChatWidget = () => {
     };
   }, [user]);
 
-  // Handle chat open/close
   useEffect(() => {
     if (socket && room && isOpen) {
-      // Only mark messages as read when entering the conversation
       socket.emit('mark_messages_read', { roomId: room.id });
       
-      // Update messages to mark them as read locally
       setMessages(prevMessages => 
         prevMessages.map(msg => ({
           ...msg,
-          is_read: msg.sender_type === 'admin' ? true : msg.is_read
+          admin_read: msg.sender_type === 'admin' ? false : msg.admin_read,
+          seller_read: msg.sender_type === 'seller' ? true : msg.seller_read,
+          user_read: msg.sender_type === 'user' ? true : msg.user_read
         }))
       );
       
@@ -177,24 +169,26 @@ const ChatWidget = () => {
     }
   }, [isOpen, socket, room]);
 
-  // Mark messages as read when new messages arrive and chat is open
   useEffect(() => {
     if (isOpen && socket && room && messages.length > 0) {
-      const unreadMessages = messages.filter(msg => !msg.is_read && msg.sender_type === 'admin');
+      const unreadMessages = messages.filter(msg => 
+        msg.sender_type === 'admin' && 
+        (user?.role === 'seller' ? !msg.seller_read : !msg.user_read)
+      );
       if (unreadMessages.length > 0) {
         socket.emit('mark_messages_read', { roomId: room.id });
-        // Update messages to mark them as read locally
         setMessages(prevMessages => 
           prevMessages.map(msg => ({
             ...msg,
-            is_read: true
+            admin_read: msg.sender_type === 'admin' ? false : msg.admin_read,
+            seller_read: msg.sender_type === 'seller' || user?.role === 'seller' ? true : msg.seller_read,
+            user_read: msg.sender_type === 'user' || user?.role === 'user' ? true : msg.user_read
           }))
         );
       }
     }
-  }, [messages, isOpen, socket, room]);
+  }, [messages, isOpen, socket, room, user?.role]);
 
-  // Handle new messages scroll
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
@@ -205,28 +199,27 @@ const ChatWidget = () => {
     e.preventDefault();
     if (!message.trim() || !socket || !room) return;
 
-    // Create temporary message for immediate display
     const tempMessage = {
       id: 'temp-' + Date.now(),
       room_id: room.id,
-      sender_id: user.id,
-      sender_type: user.role,
-      sender_name: user.username,
+      sender_id: user?.id,
+      sender_type: user?.role,
+      sender_name: user?.username,
       message: message.trim(),
       created_at: new Date().toISOString(),
-      is_read: isOpen // Mark as read if chat is open
+      admin_read: false,
+      seller_read: user?.role === 'seller',
+      user_read: user?.role === 'user'
     };
 
-    // Add temporary message to UI
     setMessages(prev => [...prev, tempMessage]);
 
-    // Send message to server with sender info and chat state
     socket.emit('send_message', {
       roomId: room.id,
       message: message.trim(),
-      sender_type: user.role,
-      sender_id: user.id,
-      isOpen: isOpen // Tell server if chat is open
+      sender_type: user?.role,
+      sender_id: user?.id,
+      isOpen: isOpen
     });
 
     setMessage('');
@@ -259,7 +252,10 @@ const ChatWidget = () => {
     setIsOpen(!isOpen);
   };
 
-  if (!user || user.role === 'admin') return null;
+  // Only render chat widget for non-admin users who are logged in
+  if (userLoading || !user || !user.role || user.role === 'admin') {
+    return null;
+  }
 
   return (
     <>
@@ -334,9 +330,15 @@ const ChatWidget = () => {
         sx={{ position: 'fixed', bottom: 16, right: 16 }}
         onClick={toggleChat}
       >
-        {messages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length > 0 && (
+        {messages.filter(msg => 
+          msg.sender_type === 'admin' && 
+          (user?.role === 'seller' ? !msg.seller_read : !msg.user_read)
+        ).length > 0 ? (
           <Badge 
-            badgeContent={messages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length}
+            badgeContent={messages.filter(msg => 
+              msg.sender_type === 'admin' && 
+              (user?.role === 'seller' ? !msg.seller_read : !msg.user_read)
+            ).length}
             color="error"
             sx={{ 
               "& .MuiBadge-badge": {
@@ -348,8 +350,7 @@ const ChatWidget = () => {
           >
             <ChatIcon />
           </Badge>
-        )}
-        {messages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length === 0 && (
+        ) : (
           <ChatIcon />
         )}
       </Fab>
