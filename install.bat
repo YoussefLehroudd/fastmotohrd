@@ -1,4 +1,6 @@
 @echo off
+REM 7ta hadi bach dir installe lkolchy
+
 echo Installing root dependencies...
 call npm install
 
