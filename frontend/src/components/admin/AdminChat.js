@@ -98,7 +98,11 @@ const AdminChat = () => {
 
   useEffect(() => {
     selectedRoomRef.current = selectedRoom;
-  }, [selectedRoom]);
+    // When room is selected and socket exists, mark messages as read
+    if (selectedRoom && socket) {
+      socket.emit('mark_messages_read', { roomId: selectedRoom.id });
+    }
+  }, [selectedRoom, socket]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
@@ -120,6 +124,15 @@ const AdminChat = () => {
       })
         .then(res => res.json())
         .then(data => {
+          // If we have a selected room, mark its messages as read
+          if (selectedRoomRef.current) {
+            const roomId = selectedRoomRef.current.id;
+            newSocket.emit('mark_messages_read', { roomId });
+            // Update the room's unread count in the data
+            data = data.map(room => 
+              room.id === roomId ? { ...room, unread_count: 0 } : room
+            );
+          }
           setRooms(data);
           setLoading(false);
         })
