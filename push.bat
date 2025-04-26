@@ -1,4 +1,6 @@
 @echo off
+REM hadi bach ydir psh l projet aml bga3 es file li fih
+
 echo === Git Status ===
 git status
 
