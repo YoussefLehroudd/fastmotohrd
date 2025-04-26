@@ -94,6 +94,12 @@ const handleConnection = async (socket) => {
           AND is_read = false
         `, [roomId]);
 
+        // Update unread count in chat_rooms table
+        await db.query(
+          'UPDATE chat_rooms SET unread_count = ? WHERE id = ?',
+          [unreadResult[0].count, roomId]
+        );
+
         // Emit updated unread count to all admins
         io.to('admin_room').emit('unread_count_updated', {
           roomId,
@@ -106,6 +112,7 @@ const handleConnection = async (socket) => {
           io.to(`user_${room[0].user_id}`).emit('admin_messages_read', { roomId });
         }
       } else {
+        // Mark admin messages as read
         await db.query(
           'UPDATE chat_messages SET is_read = true WHERE room_id = ? AND sender_type = ?',
           [roomId, 'admin']
@@ -116,6 +123,9 @@ const handleConnection = async (socket) => {
           'UPDATE chat_rooms SET unread_count = 0 WHERE id = ?',
           [roomId]
         );
+
+        // Notify admin that messages were read
+        io.to('admin_room').emit('messages_read_by_user', { roomId, userId });
       }
     } catch (error) {
       console.error('Error marking messages as read:', error);

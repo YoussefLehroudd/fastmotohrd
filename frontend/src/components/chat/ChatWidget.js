@@ -156,29 +156,38 @@ const ChatWidget = () => {
 
   // Handle chat open/close
   useEffect(() => {
-    if (isOpen && socket && room) {
-      // Mark messages as read when opening chat
-      socket.emit('mark_messages_read', { roomId: room.id });
-      
-      // Update messages to mark them as read locally
-      setMessages(prevMessages => 
-        prevMessages.map(msg => ({
-          ...msg,
-          is_read: true
-        }))
-      );
-      
-      setUnreadCount(0);
-      scrollToBottom();
+    if (socket && room) {
+      // Mark messages as read when opening chat or on page load if chat is open
+      if (isOpen) {
+        socket.emit('mark_messages_read', { roomId: room.id });
+        
+        // Update messages to mark them as read locally
+        setMessages(prevMessages => 
+          prevMessages.map(msg => ({
+            ...msg,
+            is_read: true
+          }))
+        );
+        
+        setUnreadCount(0);
+        scrollToBottom();
+      }
     }
   }, [isOpen, socket, room]);
 
-  // Also mark messages as read when new messages arrive and chat is open
+  // Mark messages as read when new messages arrive and chat is open
   useEffect(() => {
     if (isOpen && socket && room && messages.length > 0) {
       const unreadMessages = messages.filter(msg => !msg.is_read && msg.sender_type === 'admin');
       if (unreadMessages.length > 0) {
         socket.emit('mark_messages_read', { roomId: room.id });
+        // Update messages to mark them as read locally
+        setMessages(prevMessages => 
+          prevMessages.map(msg => ({
+            ...msg,
+            is_read: true
+          }))
+        );
       }
     }
   }, [messages, isOpen, socket, room]);
