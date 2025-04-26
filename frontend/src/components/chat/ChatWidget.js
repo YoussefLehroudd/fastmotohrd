@@ -87,10 +87,8 @@ const ChatWidget = () => {
           // Update admin message count
           if (message.sender_type === 'admin') {
             setAdminMessageCount(count => count + 1);
-            // Only increment unread count if chat is closed
-            if (!isOpen && !message.is_read) {
-              setUnreadCount(prev => prev + 1);
-            }
+            // Always mark as unread initially
+            message.is_read = false;
           }
           
           return newMessages;
@@ -123,6 +121,13 @@ const ChatWidget = () => {
     // Listen for admin_messages_read event to reset unread count
     newSocket.on('admin_messages_read', ({ roomId }) => {
       setUnreadCount(0);
+      // Also update messages to mark them as read
+      setMessages(prevMessages => 
+        prevMessages.map(msg => ({
+          ...msg,
+          is_read: true
+        }))
+      );
     });
 
     // Get initial chat room and messages
@@ -156,22 +161,19 @@ const ChatWidget = () => {
 
   // Handle chat open/close
   useEffect(() => {
-    if (socket && room) {
-      // Mark messages as read when opening chat or on page load if chat is open
-      if (isOpen) {
-        socket.emit('mark_messages_read', { roomId: room.id });
-        
-        // Update messages to mark them as read locally
-        setMessages(prevMessages => 
-          prevMessages.map(msg => ({
-            ...msg,
-            is_read: true
-          }))
-        );
-        
-        setUnreadCount(0);
-        scrollToBottom();
-      }
+    if (socket && room && isOpen) {
+      // Only mark messages as read when entering the conversation
+      socket.emit('mark_messages_read', { roomId: room.id });
+      
+      // Update messages to mark them as read locally
+      setMessages(prevMessages => 
+        prevMessages.map(msg => ({
+          ...msg,
+          is_read: msg.sender_type === 'admin' ? true : msg.is_read
+        }))
+      );
+      
+      scrollToBottom();
     }
   }, [isOpen, socket, room]);
 
@@ -254,13 +256,6 @@ const ChatWidget = () => {
   };
 
   const toggleChat = () => {
-    if (!isOpen) {
-      setUnreadCount(0);
-      // Mark messages as read when opening chat
-      if (socket && room) {
-        socket.emit('mark_messages_read', { roomId: room.id });
-      }
-    }
     setIsOpen(!isOpen);
   };
 
@@ -339,19 +334,24 @@ const ChatWidget = () => {
         sx={{ position: 'fixed', bottom: 16, right: 16 }}
         onClick={toggleChat}
       >
-        <Badge 
-          badgeContent={unreadCount}
-          color="error"
-          sx={{ 
-            "& .MuiBadge-badge": {
-              fontSize: "0.8rem",
-              minWidth: "20px",
-              height: "20px"
-            }
-          }}
-        >
+        {messages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length > 0 && (
+          <Badge 
+            badgeContent={messages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length}
+            color="error"
+            sx={{ 
+              "& .MuiBadge-badge": {
+                fontSize: "0.8rem",
+                minWidth: "20px",
+                height: "20px"
+              }
+            }}
+          >
+            <ChatIcon />
+          </Badge>
+        )}
+        {messages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length === 0 && (
           <ChatIcon />
-        </Badge>
+        )}
       </Fab>
     </>
   );
