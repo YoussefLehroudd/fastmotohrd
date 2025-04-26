@@ -156,12 +156,10 @@ const AdminChat = () => {
         // Add the new message
         const updatedMessages = [...filteredMessages, message];
 
-        // Update unread count if provided in message, otherwise calculate
-        const newUnreadCount = message.unread_count !== undefined 
-          ? message.unread_count 
-          : (message.sender_type !== 'admin' && !isCurrentRoomSelected 
-              ? (room.unread_count || 0) + 1 
-              : room.unread_count || 0);
+        // Always increment unread count for non-admin messages when room not selected
+        const newUnreadCount = message.sender_type !== 'admin' 
+          ? (isCurrentRoomSelected ? 0 : (room.unread_count || 0) + 1)
+          : (room.unread_count || 0);
 
         updatedRooms[roomIndex] = {
           ...room,

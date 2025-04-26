@@ -45,6 +45,7 @@ const ChatWidget = () => {
   const [socket, setSocket] = useState(null);
   const [room, setRoom] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [adminMessageCount, setAdminMessageCount] = useState(0);
   const messagesEndRef = useRef(null);
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef(null);
@@ -82,10 +83,16 @@ const ChatWidget = () => {
         // Add the new message if it doesn't exist
         if (!filteredMessages.some(msg => msg.id === message.id)) {
           const newMessages = [...filteredMessages, message];
-          // Only increment unread count if chat is closed and message is from admin
-          if (message.sender_type === 'admin' && !isOpen && !message.is_read) {
-            setUnreadCount(prev => prev + 1);
+          
+          // Update admin message count
+          if (message.sender_type === 'admin') {
+            setAdminMessageCount(count => count + 1);
+            // Only increment unread count if chat is closed
+            if (!isOpen && !message.is_read) {
+              setUnreadCount(prev => prev + 1);
+            }
           }
+          
           return newMessages;
         }
         return prev;
@@ -98,11 +105,17 @@ const ChatWidget = () => {
     });
 
     newSocket.on('message_deleted', ({ messageId }) => {
-      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+      setMessages(prev => {
+        const updatedMessages = prev.filter(msg => msg.id !== messageId);
+        // Update admin message count
+        setAdminMessageCount(updatedMessages.filter(m => m.sender_type === 'admin').length);
+        return updatedMessages;
+      });
     });
 
     newSocket.on('conversation_deleted', () => {
       setMessages([]);
+      setAdminMessageCount(0);
     });
 
     setSocket(newSocket);
@@ -128,6 +141,8 @@ const ChatWidget = () => {
         setRoom(roomData);
         const initialMessages = roomData.messages || [];
         setMessages(initialMessages);
+        // Set initial admin message count
+        setAdminMessageCount(initialMessages.filter(m => m.sender_type === 'admin').length);
         setUnreadCount(initialMessages.filter(msg => !msg.is_read && msg.sender_type === 'admin').length);
       })
       .catch(error => {
@@ -188,18 +203,19 @@ const ChatWidget = () => {
       sender_name: user.username,
       message: message.trim(),
       created_at: new Date().toISOString(),
-      is_read: false
+      is_read: isOpen // Mark as read if chat is open
     };
 
     // Add temporary message to UI
     setMessages(prev => [...prev, tempMessage]);
 
-    // Send message to server with sender info
+    // Send message to server with sender info and chat state
     socket.emit('send_message', {
       roomId: room.id,
       message: message.trim(),
       sender_type: user.role,
-      sender_id: user.id
+      sender_id: user.id,
+      isOpen: isOpen // Tell server if chat is open
     });
 
     setMessage('');
@@ -256,7 +272,7 @@ const ChatWidget = () => {
             <Box>
               <Box>Support Chat</Box>
               <Typography variant="caption" color="textSecondary">
-                {`Messages from admin: ${messages.filter(m => m.sender_type === 'admin').length}`}
+                {`Messages from admin: ${adminMessageCount}`}
               </Typography>
             </Box>
             <IconButton size="small" onClick={toggleChat}>
