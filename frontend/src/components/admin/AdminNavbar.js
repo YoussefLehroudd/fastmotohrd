@@ -37,7 +37,7 @@ const AdminNavbar = ({ activeTab, setActiveTab }) => {
     { text: 'Users', icon: <PeopleIcon />, index: 1 },
     { text: 'Motors', icon: <MotorIcon />, index: 2 },
     { text: 'Bookings', icon: <BookingIcon />, index: 3 },
-    { text: 'Chat', icon: <ChatIcon />, path: '/admin/chat' },
+    { text: 'Chat', icon: <ChatIcon />, index: 4 },
   ];
 
   const handleLogout = async () => {

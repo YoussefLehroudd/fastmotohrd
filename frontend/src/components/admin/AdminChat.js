@@ -22,6 +22,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import io from 'socket.io-client';
 import { useUser } from '../../context/UserContext';
 
+
 // Styled components remain the same...
 const ChatContainer = styled(Box)({
   display: 'flex',

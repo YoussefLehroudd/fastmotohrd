@@ -13,7 +13,8 @@ import {
   Card,
   CardContent,
   Grid,
-  Button
+  Button,
+  TablePagination
 } from '@mui/material';
 import axios from 'axios';
 
@@ -25,6 +26,8 @@ const SellerPayments = () => {
     pendingPayments: "0.00",
     completedPayments: "0.00"
   });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const fetchPayments = async () => {
     try {
@@ -134,7 +137,7 @@ const SellerPayments = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {payments.map((payment) => (
+            {payments.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((payment) => (
               <TableRow key={payment.id}>
                 <TableCell>
                   {new Date(payment.created_at).toLocaleDateString()}
@@ -171,8 +174,20 @@ const SellerPayments = () => {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
-      </TableContainer>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={payments.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(event, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
+        />
     </Box>
   );
 };

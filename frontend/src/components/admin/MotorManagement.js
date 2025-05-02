@@ -28,14 +28,22 @@ const getStatusLabel = (isAvailableForRent) =>
 
 const MotorManagement = ({ motors, pagination, onPageChange, onSearch, onStatusFilter, onTypeFilter }) => {
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+
+  const handleRowsPerPageChange = (event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setPage(0);
+    onPageChange(1, newRowsPerPage);
+  };
   
 
   const handlePageChange = (event, newPage) => {
     setPage(newPage);
-    onPageChange(newPage + 1);
+    onPageChange(newPage + 1, rowsPerPage);
   };
 
   const handleSearch = (event) => {
@@ -157,8 +165,9 @@ const MotorManagement = ({ motors, pagination, onPageChange, onSearch, onStatusF
         count={pagination.total || 0}
         page={page}
         onPageChange={handlePageChange}
-        rowsPerPage={10}
-        rowsPerPageOptions={[10]}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[5, 10, 25]}
+        onRowsPerPageChange={handleRowsPerPageChange}
       />
     </Box>
   );

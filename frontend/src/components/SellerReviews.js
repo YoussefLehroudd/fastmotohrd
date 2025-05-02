@@ -12,7 +12,8 @@ import {
   Stack,
   Avatar,
   Chip,
-  LinearProgress
+  LinearProgress,
+  TablePagination
 } from '@mui/material';
 import {
   Reply as ReplyIcon,
@@ -23,6 +24,8 @@ import { useUser } from '../context/UserContext';
 
 const SellerReviews = () => {
   const { user } = useUser();
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
   const [reviewsData, setReviewsData] = useState({
     reviews: [],
     stats: {
@@ -177,7 +180,9 @@ const SellerReviews = () => {
 
       {/* Reviews List */}
       <Stack spacing={2}>
-        {reviewsData.reviews.map((review) => (
+        {reviewsData.reviews
+          .slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+          .map((review) => (
           <Paper key={review.id} sx={{ p: 3 }}>
             <Grid container spacing={2}>
               <Grid item>
@@ -306,6 +311,20 @@ const SellerReviews = () => {
           </Paper>
         ))}
       </Stack>
+      <Box sx={{ mt: 2 }}>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={reviewsData.reviews.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(event, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
+        />
+      </Box>
     </Box>
   );
 };

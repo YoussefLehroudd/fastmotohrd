@@ -21,6 +21,7 @@ import AdminStats from '../components/admin/AdminStats';
 import UserManagement from '../components/admin/UserManagement';
 import MotorManagement from '../components/admin/MotorManagement';
 import BookingManagement from '../components/admin/BookingManagement';
+import AdminChat from '../components/admin/AdminChat';
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -153,10 +154,10 @@ const Admin = () => {
     }
   };
 
-  const fetchUsers = async (page = 1, search = '', role = '') => {
+  const fetchUsers = async (page = 1, search = '', role = '', limit = 10) => {
     try {
       const { data } = await axios.get(
-        `http://localhost:5000/api/admin/users?page=${page}&search=${search}&role=${role}`,
+        `http://localhost:5000/api/admin/users?page=${page}&limit=${limit}&search=${search}&role=${role}`,
         { withCredentials: true }
       );
       setUsers({ data: data.users, pagination: data.pagination });
@@ -165,10 +166,10 @@ const Admin = () => {
     }
   };
 
-  const fetchMotors = async (page = 1, search = '', status = '', type = '') => {
+  const fetchMotors = async (page = 1, search = '', status = '', type = '', limit = 10) => {
     try {
       const { data } = await axios.get(
-        `http://localhost:5000/api/admin/motors?page=${page}&search=${search}&status=${status}&type=${type}`,
+        `http://localhost:5000/api/admin/motors?page=${page}&limit=${limit}&search=${search}&status=${status}&type=${type}`,
         { withCredentials: true }
       );
       setMotors({ data: data.motors, pagination: data.pagination });
@@ -177,10 +178,10 @@ const Admin = () => {
     }
   };
 
-  const fetchBookings = async (page = 1, search = '', status = '') => {
+  const fetchBookings = async (page = 1, search = '', status = '', limit = 10) => {
     try {
       const { data } = await axios.get(
-        `http://localhost:5000/api/admin/bookings?page=${page}&search=${search}&status=${status}`,
+        `http://localhost:5000/api/admin/bookings?page=${page}&limit=${limit}&search=${search}&status=${status}`,
         { withCredentials: true }
       );
       setBookings({ data: data.bookings, pagination: data.pagination });
@@ -292,7 +293,7 @@ const Admin = () => {
           <UserManagement
             users={users.data}
             pagination={users.pagination}
-            onPageChange={(page) => fetchUsers(page)}
+            onPageChange={(page, limit) => fetchUsers(page, '', '', limit)}
             onSearch={(term) => fetchUsers(1, term)}
             onRoleFilter={(role) => fetchUsers(1, '', role)}
             onUpdateStatus={handleUserStatusUpdate}
@@ -304,7 +305,7 @@ const Admin = () => {
           <MotorManagement
             motors={motors.data}
             pagination={motors.pagination}
-            onPageChange={(page) => fetchMotors(page)}
+            onPageChange={(page, limit) => fetchMotors(page, '', '', '', limit)}
             onSearch={(term) => fetchMotors(1, term)}
             onStatusFilter={(status) => fetchMotors(1, '', status)}
             onTypeFilter={(type) => fetchMotors(1, '', '', type)}
@@ -315,11 +316,13 @@ const Admin = () => {
           <BookingManagement
             bookings={bookings.data}
             pagination={bookings.pagination}
-            onPageChange={(page) => fetchBookings(page)}
+            onPageChange={(page, limit) => fetchBookings(page, '', '', limit)}
             onSearch={(term) => fetchBookings(1, term)}
             onStatusFilter={(status) => fetchBookings(1, '', status)}
           />
         );
+      case 4:
+        return <AdminChat />;
       default:
         return null;
     }

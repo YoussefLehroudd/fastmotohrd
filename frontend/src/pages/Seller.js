@@ -24,7 +24,8 @@ import {
   Chip,
   Fab,
   MenuItem,
-  Snackbar
+  Snackbar,
+  TablePagination
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -51,6 +52,8 @@ const Seller = () => {
   const [formData, setFormData] = useState({});
   const [error, setError] = useState({ show: false, message: '' });
   const [success, setSuccess] = useState({ show: false, message: '' });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     fetchMotors();
@@ -299,8 +302,9 @@ const Seller = () => {
           {selectedTab === 3 && <SellerReviews />}
           {selectedTab === 4 && (
             <>
-              <Grid container spacing={3}>
-                {motors.map((motor) => (
+              <Box>
+                <Grid container spacing={3}>
+                  {motors.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((motor) => (
                   <Grid item xs={12} sm={6} md={4} key={motor.id}>
                     <Card>
                       {motor.imageUrl && (
@@ -419,8 +423,21 @@ const Seller = () => {
                       </CardActions>
                     </Card>
                   </Grid>
-                ))}
-              </Grid>
+                  ))}
+                </Grid>
+                <TablePagination
+                  rowsPerPageOptions={[5, 10, 25]}
+                  component="div"
+                  count={motors.length}
+                  rowsPerPage={rowsPerPage}
+                  page={page}
+                  onPageChange={(event, newPage) => setPage(newPage)}
+                  onRowsPerPageChange={(event) => {
+                    setRowsPerPage(parseInt(event.target.value, 10));
+                    setPage(0);
+                  }}
+                />
+              </Box>
               <Stack 
                 sx={{ 
                   position: 'fixed', 

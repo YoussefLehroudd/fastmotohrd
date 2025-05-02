@@ -176,7 +176,7 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
 // Get users list with pagination and filters
 router.get('/users', authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 10, role, search } = req.query;
+  const { page = 1, limit = 10, role = '', search = '' } = req.query;
     const offset = (page - 1) * limit;
     
     let query = 'SELECT id, username, email, role, isBlocked, isVerified, created_at FROM users WHERE 1=1';
@@ -269,7 +269,7 @@ router.patch('/users/:id/role', authenticateAdmin, async (req, res) => {
 // Get motors list with pagination and filters
 router.get('/motors', authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, type, search } = req.query;
+  const { page = 1, limit = 10, status = '', type = '', search = '' } = req.query;
     const offset = (page - 1) * limit;
     
     let query = `
@@ -334,7 +334,7 @@ router.get('/motors', authenticateAdmin, async (req, res) => {
 // Get bookings list with pagination and filters
 router.get('/bookings', authenticateAdmin, async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, search } = req.query;
+  const { page = 1, limit = 10, status = '', search = '' } = req.query;
     const offset = (page - 1) * limit;
     
     let query = `

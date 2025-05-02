@@ -46,15 +46,23 @@ const paymentStatusColors = {
 
 const BookingManagement = ({ bookings, pagination, onPageChange, onSearch, onStatusFilter }) => {
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [detailsDialog, setDetailsDialog] = useState(false);
 
+  const handleRowsPerPageChange = (event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setPage(0);
+    onPageChange(1, newRowsPerPage);
+  };
+
 
   const handlePageChange = (event, newPage) => {
     setPage(newPage);
-    onPageChange(newPage + 1);
+    onPageChange(newPage + 1, rowsPerPage);
   };
 
   const handleSearch = (event) => {
@@ -171,8 +179,9 @@ const BookingManagement = ({ bookings, pagination, onPageChange, onSearch, onSta
         count={pagination.total || 0}
         page={page}
         onPageChange={handlePageChange}
-        rowsPerPage={10}
-        rowsPerPageOptions={[10]}
+        rowsPerPage={rowsPerPage}
+        rowsPerPageOptions={[5, 10, 25]}
+        onRowsPerPageChange={handleRowsPerPageChange}
       />
 
       {/* Booking Details Dialog */}

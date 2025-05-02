@@ -11,6 +11,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Paper,
   Chip,
   Stack,
@@ -41,6 +42,8 @@ const SellerDashboard = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [bookingDetails, setBookingDetails] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -179,7 +182,9 @@ const SellerDashboard = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {dashboardData.recentBookings.map((booking) => (
+              {dashboardData.recentBookings
+                .slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+                .map((booking) => (
                 <TableRow 
                   key={booking.id}
                   onClick={() => handleRowClick(booking)}
@@ -206,7 +211,20 @@ const SellerDashboard = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
+          component="div"
+          count={dashboardData.recentBookings.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(event, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(parseInt(event.target.value, 10));
+            setPage(0);
+          }}
+        />
       </Paper>
+
       {/* Booking Details Dialog */}
       <Dialog
         open={detailsDialogOpen} 
