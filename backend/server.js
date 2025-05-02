@@ -831,6 +831,7 @@ app.use('/api/motors/:motorId/reviews', (req, res, next) => {
 }, reviewsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/admin', require('./routes/admin/chat'));
 app.use('/api/tracking', require('./routes/tracking'));
 
 app.post('/api/auth/resend-otp', async (req, res) => {

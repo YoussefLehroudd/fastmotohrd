@@ -11,7 +11,9 @@ import {
   TextField,
   IconButton,
   CircularProgress,
-  Container
+  useTheme,
+  useMediaQuery,
+  InputAdornment
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SendIcon from '@mui/icons-material/Send';
@@ -19,63 +21,112 @@ import PersonIcon from '@mui/icons-material/Person';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import SearchIcon from '@mui/icons-material/Search';
 import io from 'socket.io-client';
 import { useUser } from '../../context/UserContext';
 
-
-// Styled components remain the same...
-const ChatContainer = styled(Box)({
+// Styled components
+const PageContainer = styled(Box)({
+  height: '100vh',
   display: 'flex',
-  height: 'calc(100vh - 100px)',
-  gap: '20px',
-  padding: '20px'
+  flexDirection: 'column',
+  overflow: 'hidden'
 });
 
-const ChatList = styled(Paper)({
-  width: '300px',
-  overflow: 'auto'
-});
-
-const ChatBox = styled(Paper)({
+const ChatContainer = styled(Box)(({ theme }) => ({
   flex: 1,
   display: 'flex',
-  flexDirection: 'column'
-});
+  gap: '16px',
+  padding: '16px',
+  height: '100%',
+  overflow: 'hidden',
+  [theme.breakpoints.down('sm')]: {
+    padding: '8px',
+    gap: '8px'
+  }
+}));
+
+const ChatList = styled(Paper)(({ theme }) => ({
+  width: '300px',
+  overflow: 'auto',
+  [theme.breakpoints.down('sm')]: {
+    width: '100%',
+    maxHeight: '300px',
+    display: 'block'
+  }
+}));
+
+const ChatBox = styled(Paper)(({ theme }) => ({
+  flex: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden'
+}));
 
 const MessageContainer = styled(Box)({
   flex: 1,
   overflowY: 'auto',
-  padding: '20px',
+  padding: '8px 16px',
   display: 'flex',
-  flexDirection: 'column-reverse',
-  height: '100%'
-});
-
-const MessageWrapper = styled(Box)({
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'flex-start',
-  marginBottom: 8,
-  '&:hover .delete-button': {
-    opacity: 1
+  flexDirection: 'column',
+  gap: '4px',
+  '&::-webkit-scrollbar': {
+    width: '8px'
+  },
+  '&::-webkit-scrollbar-track': {
+    background: '#f1f1f1'
+  },
+  '&::-webkit-scrollbar-thumb': {
+    background: '#888',
+    borderRadius: '4px',
+    '&:hover': {
+      background: '#555'
+    }
   }
 });
 
+const MessageWrapper = styled(Box)(({ theme, isOwn }) => ({
+  position: 'relative',
+  display: 'flex',
+  alignItems: 'center',
+  marginBottom: 4,
+  justifyContent: isOwn ? 'flex-end' : 'flex-start',
+  gap: '4px',
+  padding: '4px 8px',
+  flexDirection: isOwn ? 'row-reverse' : 'row',
+  '& .delete-button': {
+    opacity: 0,
+    transition: 'opacity 0.2s ease'
+  },
+  '&:hover .delete-button': {
+    opacity: 1
+  }
+}));
+
 const Message = styled(Box)(({ theme, isOwn }) => ({
-  maxWidth: '70%',
+  maxWidth: '85%',
   padding: '8px 12px',
   borderRadius: 12,
   wordWrap: 'break-word',
-  alignSelf: isOwn ? 'flex-end' : 'flex-start',
+  wordBreak: 'break-word',
+  whiteSpace: 'pre-wrap',
+  overflowWrap: 'break-word',
   backgroundColor: isOwn ? theme.palette.primary.main : theme.palette.grey[200],
   color: isOwn ? theme.palette.primary.contrastText : theme.palette.text.primary,
+  '& p': {
+    margin: 0,
+    maxWidth: '100%'
+  }
 }));
 
 const DeleteButton = styled(IconButton)({
   padding: 4,
   opacity: 0,
   transition: 'opacity 0.2s',
-  marginLeft: 8,
+  width: '24px',
+  height: '24px',
+  minWidth: '24px',
   '& svg': {
     fontSize: '1rem'
   }
@@ -83,6 +134,7 @@ const DeleteButton = styled(IconButton)({
 
 const AdminChat = () => {
   const { user } = useUser();
+  const [allRooms, setAllRooms] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [message, setMessage] = useState('');
@@ -91,35 +143,15 @@ const AdminChat = () => {
   const [isTyping, setIsTyping] = useState({});
   const messagesEndRef = useRef(null);
   const selectedRoomRef = useRef(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [showList, setShowList] = useState(true);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   };
 
   const typingTimeoutRef = useRef(null);
-
-  useEffect(() => {
-    selectedRoomRef.current = selectedRoom;
-    // When room is selected and socket exists, mark messages as read
-    if (selectedRoom && socket) {
-      socket.emit('mark_messages_read', { roomId: selectedRoom.id });
-      // Update room's unread count locally
-      setRooms(prevRooms => 
-        prevRooms.map(room => 
-          room.id === selectedRoom.id ? { ...room, unread_count: 0 } : room
-        )
-      );
-      // Update selected room's messages as read, but only for non-admin messages
-      setSelectedRoom(prev => ({
-        ...prev,
-        unread_count: 0,
-        messages: prev.messages?.map(msg => ({
-          ...msg,
-          admin_read: msg.sender_type !== 'admin' ? true : msg.admin_read
-        }))
-      }));
-    }
-  }, [selectedRoom, socket]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return;
@@ -131,24 +163,16 @@ const AdminChat = () => {
 
     newSocket.on('connect', () => {
       console.log('Socket connected');
-      // Join admin room
       newSocket.emit('join', { room: 'admin_room' });
       
       fetch('http://localhost:5000/api/chat/history', {
         method: 'GET',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
+        credentials: 'include'
       })
         .then(res => res.json())
         .then(data => {
-          // Update unread counts based on message read status
-          const updatedData = data.map(room => {
-            const unreadCount = room.messages?.filter(msg => 
-              msg.sender_type !== 'admin' && !msg.admin_read
-            ).length || 0;
-            return { ...room, unread_count: unreadCount };
-          });
-          setRooms(updatedData);
+          setAllRooms(data);
+          setRooms(data);
           setLoading(false);
         })
         .catch(error => {
@@ -157,13 +181,11 @@ const AdminChat = () => {
         });
     });
 
-    // Debug socket events
     newSocket.onAny((event, ...args) => {
       console.log('Socket event:', event, args);
     });
 
     newSocket.on('new_message', (message) => {
-      // Remove any temporary message if this is our own message
       const isOwnMessage = message.sender_id === user.id;
       
       setRooms(prevRooms => {
@@ -172,19 +194,14 @@ const AdminChat = () => {
 
         const updatedRooms = [...prevRooms];
         const room = updatedRooms[roomIndex];
-
         const isCurrentRoomSelected = selectedRoomRef.current?.id === message.room_id;
         
-        // Filter out temporary message if this is our own message
         const currentMessages = room.messages || [];
         const filteredMessages = isOwnMessage 
           ? currentMessages.filter(msg => !msg.id.toString().startsWith('temp-'))
           : currentMessages;
 
-        // Add the new message
         const updatedMessages = [...filteredMessages, message];
-
-        // Always increment unread count for non-admin messages when room not selected
         const newUnreadCount = message.sender_type !== 'admin' 
           ? (isCurrentRoomSelected ? 0 : (room.unread_count || 0) + 1)
           : (room.unread_count || 0);
@@ -196,13 +213,11 @@ const AdminChat = () => {
           unread_count: newUnreadCount
         };
 
-        // Update selected room if this is the current room
         if (isCurrentRoomSelected) {
           setSelectedRoom(prev => ({
             ...prev,
             messages: updatedMessages
           }));
-          setTimeout(scrollToBottom, 100);
         }
 
         return updatedRooms.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
@@ -226,48 +241,6 @@ const AdminChat = () => {
           messages: updatedMessages
         };
 
-        // Update selected room if this is the current room
-        if (selectedRoomRef.current?.id === roomId) {
-          setSelectedRoom(prev => ({
-            ...prev,
-            messages: updatedMessages
-          }));
-        }
-
-        return updatedRooms;
-      });
-    });
-
-    newSocket.on('conversation_deleted', ({ roomId }) => {
-      setRooms(prevRooms => prevRooms.filter(r => r.id !== roomId));
-      if (selectedRoomRef.current?.id === roomId) {
-        setSelectedRoom(null);
-      }
-    });
-
-    // Handle messages being read by users
-    newSocket.on('messages_read_by_user', ({ roomId, userId }) => {
-      setRooms(prevRooms => {
-        const roomIndex = prevRooms.findIndex(r => r.id === roomId);
-        if (roomIndex === -1) return prevRooms;
-
-        const updatedRooms = [...prevRooms];
-        const room = updatedRooms[roomIndex];
-
-        // Update messages to mark them as read
-        const updatedMessages = room.messages.map(msg => ({
-          ...msg,
-          admin_read: msg.sender_type === 'admin' ? true : msg.admin_read,
-          seller_read: msg.sender_type === 'seller' ? true : msg.seller_read,
-          user_read: msg.sender_type === 'user' ? true : msg.user_read
-        }));
-
-        updatedRooms[roomIndex] = {
-          ...room,
-          messages: updatedMessages
-        };
-
-        // Update selected room if this is the current room
         if (selectedRoomRef.current?.id === roomId) {
           setSelectedRoom(prev => ({
             ...prev,
@@ -280,27 +253,45 @@ const AdminChat = () => {
     });
 
     setSocket(newSocket);
-
     return () => newSocket.close();
   }, [user]);
 
+  const [hasScrolled, setHasScrolled] = useState(false);
 
-  // Listen for unread count updates
   useEffect(() => {
-    if (socket) {
-      socket.on('unread_count_updated', ({ roomId, unreadCount }) => {
-        setRooms(prevRooms => 
-          prevRooms.map(room => 
-            room.id === roomId ? { ...room, unread_count: unreadCount } : room
-          )
-        );
-      });
-
-      return () => {
-        socket.off('unread_count_updated');
-      };
+    selectedRoomRef.current = selectedRoom;
+    if (selectedRoom && socket) {
+      socket.emit('mark_messages_read', { roomId: selectedRoom.id });
+      setRooms(prevRooms => 
+        prevRooms.map(room => 
+          room.id === selectedRoom.id ? { ...room, unread_count: 0 } : room
+        )
+      );
+      setSelectedRoom(prev => ({
+        ...prev,
+        unread_count: 0,
+        messages: prev.messages?.map(msg => ({
+          ...msg,
+          admin_read: msg.sender_type !== 'admin' ? true : msg.admin_read
+        }))
+      }));
+      if (isMobile) {
+        setShowList(false);
+      }
+      // Only scroll to bottom when first entering a chat
+      if (!hasScrolled) {
+        scrollToBottom();
+        setHasScrolled(true);
+      }
     }
-  }, [socket]);
+  }, [selectedRoom, socket, isMobile, hasScrolled]);
+
+  // Reset hasScrolled when changing rooms
+  useEffect(() => {
+    if (selectedRoom) {
+      setHasScrolled(false);
+    }
+  }, [selectedRoom?.id]);
 
   const handleTyping = (e) => {
     setMessage(e.target.value);
@@ -320,7 +311,6 @@ const AdminChat = () => {
     e.preventDefault();
     if (!message.trim() || !socket || !selectedRoom) return;
 
-    // Create temporary message object for immediate display
     const tempMessage = {
       room_id: selectedRoom.id,
       sender_id: user.id,
@@ -328,42 +318,40 @@ const AdminChat = () => {
       sender_name: user.username,
       message: message.trim(),
       created_at: new Date().toISOString(),
-          admin_read: true,
-          seller_read: false,
-          user_read: false,
-      id: 'temp-' + Date.now() // Temporary ID
+      admin_read: true,
+      seller_read: false,
+      user_read: false,
+      id: 'temp-' + Date.now()
     };
 
-    // Update UI immediately
     setSelectedRoom(prev => ({
       ...prev,
       messages: [...(prev.messages || []), tempMessage]
     }));
 
-    // Send message to server
     socket.emit('send_message', {
       roomId: selectedRoom.id,
       message: message.trim()
     });
 
     setMessage('');
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       socket.emit('typing', { roomId: selectedRoom.id, isTyping: false });
     }
+
+    // Scroll to bottom after sending message
+    setTimeout(() => {
+      scrollToBottom();
+    }, 100);
   };
 
   if (!user || user.role !== 'admin') {
     return (
-      <Container>
-        <Typography variant="h6" align="center" sx={{ mt: 4 }}>
-          Admin access required
-        </Typography>
-      </Container>
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+        <Typography variant="h6">Admin access required</Typography>
+      </Box>
     );
   }
 
@@ -376,135 +364,225 @@ const AdminChat = () => {
   }
 
   return (
-    <Container maxWidth="xl">
+    <PageContainer>
       <ChatContainer>
-        <ChatList elevation={3}>
-          <List>
-            {rooms.map((room) => (
-              <ListItem
-                button
-                key={room.id}
-                selected={selectedRoom?.id === room.id}
-                onClick={() => setSelectedRoom(room)}
-                sx={{ position: 'relative' }}
-              >
-                <ListItemAvatar>
-                  <Avatar>
-                    {room.user_type === 'seller' ? <StorefrontIcon /> : <PersonIcon />}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={room.user_name || room.user_email || 'Unknown User'}
-                  secondary={
-                    <>
-                      {`${room.user_type} • ${new Date(room.updated_at).toLocaleDateString()}`}
-                      <br />
-                      {`Messages received: ${room.messages?.filter(m => m.sender_type !== 'admin').length || 0}`}
-                    </>
+        {(!isMobile || showList) && (
+          <ChatList elevation={3}>
+            <Box sx={{ p: 2 }}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search users..."
+                onChange={(e) => {
+                  const searchTerm = e.target.value.toLowerCase();
+                  if (!searchTerm) {
+                    setRooms(allRooms);
+                  } else {
+                    setRooms(allRooms.filter(room => 
+                      (room.user_name && room.user_name.toLowerCase().includes(searchTerm)) ||
+                      (room.user_email && room.user_email.toLowerCase().includes(searchTerm))
+                    ));
                   }
-                />
-                {room.unread_count > 0 && (
-                  <Box sx={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    bgcolor: 'error.main',
-                    color: 'white',
-                    borderRadius: '50%',
-                    width: 24,
-                    height: 24,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.75rem'
-                  }}>
-                    {room.unread_count}
-                  </Box>
-                )}
-              </ListItem>
-            ))}
-          </List>
-        </ChatList>
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: 'text.secondary' }} />
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Box>
+            <List>
+              {rooms.map((room) => (
+                <ListItem
+                  button
+                  key={room.id}
+                  selected={selectedRoom?.id === room.id}
+                  onClick={() => setSelectedRoom(room)}
+                  sx={{ position: 'relative' }}
+                >
+                  <ListItemAvatar>
+                    <Avatar>
+                      {room.user_type === 'seller' ? <StorefrontIcon /> : <PersonIcon />}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={room.user_name || room.user_email || 'Unknown User'}
+                    secondary={
+                      <>
+                        {`${room.user_type} • ${new Date(room.updated_at).toLocaleDateString()}`}
+                        <br />
+                        {`Messages received: ${room.messages?.filter(m => m.sender_type !== 'admin').length || 0}`}
+                      </>
+                    }
+                  />
+                  {room.unread_count > 0 && (
+                    <Box sx={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      bgcolor: 'error.main',
+                      color: 'white',
+                      borderRadius: '50%',
+                      width: 24,
+                      height: 24,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.75rem'
+                    }}>
+                      {room.unread_count}
+                    </Box>
+                  )}
+                </ListItem>
+              ))}
+            </List>
+          </ChatList>
+        )}
 
-        <ChatBox elevation={3}>
-          {selectedRoom ? (
-            <>
-              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography variant="h6">
-                    {selectedRoom.user_name || selectedRoom.user_email || 'Unknown User'}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    {selectedRoom.user_type} • {selectedRoom.messages?.filter(m => m.sender_type !== 'admin').length || 0} messages received
-                  </Typography>
-                </Box>
-                <IconButton color="error" onClick={() => {
-                  if (window.confirm('Delete entire conversation?')) {
-                    socket.emit('delete_conversation', { roomId: selectedRoom.id });
-                    setSelectedRoom(null);
-                  }
-                }}>
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-
-              <MessageContainer>
-                <div ref={messagesEndRef} />
-                {isTyping[selectedRoom.id] && (
-                  <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', ml: 1 }}>
-                    User is typing...
-                  </Box>
-                )}
-                {[...(selectedRoom.messages || [])].reverse().map((msg, index) => (
-                  <MessageWrapper key={msg.id || index} sx={{ justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start' }}>
-                    <Message isOwn={msg.sender_id === user.id}>
-                      <Typography variant="body2" color="textSecondary" gutterBottom>
-                        {msg.sender_name}
-                      </Typography>
-                      {msg.message}
-                    </Message>
-                    {!msg.id.toString().startsWith('temp-') && (
-                      <DeleteButton
-                        className="delete-button"
-                        size="small"
+        {(!isMobile || !showList) && (
+          <ChatBox elevation={3}>
+            {selectedRoom ? (
+              <>
+                <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {isMobile && (
+                      <IconButton 
                         onClick={() => {
-                          if (window.confirm('Delete this message?')) {
-                            socket.emit('delete_message', {
-                              messageId: msg.id,
-                              roomId: selectedRoom.id
-                            });
-                          }
+                          setShowList(true);
+                          setSelectedRoom(null);
                         }}
                       >
-                        <DeleteOutlineIcon />
-                      </DeleteButton>
+                        <ArrowBackIcon />
+                      </IconButton>
                     )}
-                  </MessageWrapper>
-                ))}
-              </MessageContainer>
+                    <Box>
+                      <Typography variant="h6">
+                        {selectedRoom.user_name || selectedRoom.user_email || 'Unknown User'}
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        {selectedRoom.user_type} • {selectedRoom.messages?.filter(m => m.sender_type !== 'admin').length || 0} messages received
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <IconButton color="error" onClick={() => {
+                    if (window.confirm('Delete entire conversation?')) {
+                      socket.emit('delete_conversation', { roomId: selectedRoom.id });
+                      // Remove the room from both room lists immediately
+                      setAllRooms(prevRooms => prevRooms.filter(room => room.id !== selectedRoom.id));
+                      setRooms(prevRooms => prevRooms.filter(room => room.id !== selectedRoom.id));
+                      setSelectedRoom(null);
+                      if (isMobile) setShowList(true);
+                    }
+                  }}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
 
-              <Box component="form" onSubmit={handleSend} sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Type a message..."
-                  value={message}
-                  onChange={handleTyping}
-                />
-                <IconButton type="submit" color="primary">
-                  <SendIcon />
-                </IconButton>
+                <MessageContainer>
+                  {[...(selectedRoom.messages || [])].map((msg, index) => (
+                    <MessageWrapper key={msg.id || index} sx={{ justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start' }}>
+                      {!msg.id.toString().startsWith('temp-') && (
+                        <>
+                          {msg.sender_id === user.id && (
+                            <DeleteButton
+                              className="delete-button"
+                              size="small"
+                              onClick={() => {
+                                if (window.confirm('Delete this message?')) {
+                                  socket.emit('delete_message', {
+                                    messageId: msg.id,
+                                    roomId: selectedRoom.id
+                                  });
+                                }
+                              }}
+                            >
+                              <DeleteOutlineIcon />
+                            </DeleteButton>
+                          )}
+                          <Message isOwn={msg.sender_id === user.id}>
+                            <Typography sx={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                              {msg.message}
+                            </Typography>
+                          </Message>
+                          {msg.sender_id !== user.id && (
+                            <DeleteButton
+                              className="delete-button"
+                              size="small"
+                              onClick={() => {
+                                if (window.confirm('Delete this message?')) {
+                                  socket.emit('delete_message', {
+                                    messageId: msg.id,
+                                    roomId: selectedRoom.id
+                                  });
+                                }
+                              }}
+                            >
+                              <DeleteOutlineIcon />
+                            </DeleteButton>
+                          )}
+                        </>
+                      )}
+                    </MessageWrapper>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </MessageContainer>
+                {isTyping[selectedRoom.id] && (
+                    <Box sx={{ 
+                      fontSize: '0.75rem',
+                      color: 'text.secondary',
+                      opacity: 0.8,
+                      mb: 1,
+                      mt: 'auto',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      '&::before': {
+                        content: '""',
+                        width: '4px',
+                        height: '4px',
+                        backgroundColor: 'currentColor',
+                        borderRadius: '50%',
+                        animation: 'pulse 1s infinite'
+                      },
+                      '@keyframes pulse': {
+                        '0%': { opacity: 0.4 },
+                        '50%': { opacity: 1 },
+                        '100%': { opacity: 0.4 }
+                      }
+                    }}>
+                      User is typing...
+                    </Box>
+                  )}
+              
+                <Box component="form" onSubmit={handleSend} sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Type a message..."
+                    value={message}
+                    onChange={handleTyping}
+                    inputProps={{
+                      title: '' // Remove the tooltip
+                    }}
+
+                  />
+                  <IconButton type="submit" color="primary">
+                    <SendIcon />
+                  </IconButton>
+                </Box>
+              </>
+            ) : (
+              <Box display="flex" justifyContent="center" alignItems="center" height="100%">
+                <Typography color="textSecondary">Select a chat to start messaging</Typography>
               </Box>
-            </>
-          ) : (
-            <Box display="flex" justifyContent="center" alignItems="center" height="100%">
-              <Typography color="textSecondary">Select a chat to start messaging</Typography>
-            </Box>
-          )}
-        </ChatBox>
+            )}
+          </ChatBox>
+        )}
       </ChatContainer>
-    </Container>
+    </PageContainer>
   );
 };
 
