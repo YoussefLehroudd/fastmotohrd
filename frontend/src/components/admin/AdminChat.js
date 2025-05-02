@@ -13,7 +13,11 @@ import {
   CircularProgress,
   useTheme,
   useMediaQuery,
-  InputAdornment
+  InputAdornment,
+  Dialog,
+  DialogTitle,
+  DialogActions,
+  Button
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SendIcon from '@mui/icons-material/Send';
@@ -136,6 +140,9 @@ const AdminChat = () => {
   const { user } = useUser();
   const [allRooms, setAllRooms] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState(null);
+  const [messageToDelete, setMessageToDelete] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [message, setMessage] = useState('');
   const [socket, setSocket] = useState(null);
@@ -467,16 +474,13 @@ const AdminChat = () => {
                       </Typography>
                     </Box>
                   </Box>
-                  <IconButton color="error" onClick={() => {
-                    if (window.confirm('Delete entire conversation?')) {
-                      socket.emit('delete_conversation', { roomId: selectedRoom.id });
-                      // Remove the room from both room lists immediately
-                      setAllRooms(prevRooms => prevRooms.filter(room => room.id !== selectedRoom.id));
-                      setRooms(prevRooms => prevRooms.filter(room => room.id !== selectedRoom.id));
-                      setSelectedRoom(null);
-                      if (isMobile) setShowList(true);
-                    }
-                  }}>
+                  <IconButton 
+                    color="error" 
+                    onClick={() => {
+                      setRoomToDelete(selectedRoom);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
                     <DeleteIcon />
                   </IconButton>
                 </Box>
@@ -491,12 +495,8 @@ const AdminChat = () => {
                               className="delete-button"
                               size="small"
                               onClick={() => {
-                                if (window.confirm('Delete this message?')) {
-                                  socket.emit('delete_message', {
-                                    messageId: msg.id,
-                                    roomId: selectedRoom.id
-                                  });
-                                }
+                                setMessageToDelete(msg);
+                                setDeleteDialogOpen(true);
                               }}
                             >
                               <DeleteOutlineIcon />
@@ -512,12 +512,8 @@ const AdminChat = () => {
                               className="delete-button"
                               size="small"
                               onClick={() => {
-                                if (window.confirm('Delete this message?')) {
-                                  socket.emit('delete_message', {
-                                    messageId: msg.id,
-                                    roomId: selectedRoom.id
-                                  });
-                                }
+                                setMessageToDelete(msg);
+                                setDeleteDialogOpen(true);
                               }}
                             >
                               <DeleteOutlineIcon />
@@ -564,10 +560,6 @@ const AdminChat = () => {
                     placeholder="Type a message..."
                     value={message}
                     onChange={handleTyping}
-                    inputProps={{
-                      title: '' // Remove the tooltip
-                    }}
-
                   />
                   <IconButton type="submit" color="primary">
                     <SendIcon />
@@ -582,6 +574,64 @@ const AdminChat = () => {
           </ChatBox>
         )}
       </ChatContainer>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setRoomToDelete(null);
+          setMessageToDelete(null);
+        }}
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            minWidth: 300
+          }
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center' }}>
+          {messageToDelete ? 'Delete this message?' : 'Delete this conversation?'}
+        </DialogTitle>
+        <DialogActions sx={{ justifyContent: 'center', pb: 2, gap: 1 }}>
+          <Button 
+            variant="contained"
+            onClick={() => {
+              if (messageToDelete) {
+                socket.emit('delete_message', {
+                  messageId: messageToDelete.id,
+                  roomId: selectedRoom.id
+                });
+              } else if (roomToDelete) {
+                socket.emit('delete_conversation', { roomId: roomToDelete.id });
+                setAllRooms(prevRooms => prevRooms.filter(room => room.id !== roomToDelete.id));
+                setRooms(prevRooms => prevRooms.filter(room => room.id !== roomToDelete.id));
+                setSelectedRoom(null);
+                if (isMobile) setShowList(true);
+              }
+              setDeleteDialogOpen(false);
+              setRoomToDelete(null);
+              setMessageToDelete(null);
+            }}
+            sx={{
+              bgcolor: 'error.main',
+              '&:hover': {
+                bgcolor: 'error.dark'
+              }
+            }}
+          >
+            Delete
+          </Button>
+          <Button 
+            variant="outlined"
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setRoomToDelete(null);
+              setMessageToDelete(null);
+            }}
+          >
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
     </PageContainer>
   );
 };
