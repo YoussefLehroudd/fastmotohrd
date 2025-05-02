@@ -19,13 +19,17 @@ import {
   Checkbox,
   FormGroup,
   Divider,
-  Paper
+  Paper,
+  Radio,
+  RadioGroup
 } from '@mui/material';
 import {
   Search as SearchIcon,
   CalendarMonth as CalendarIcon,
   AttachMoney as MoneyIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
@@ -39,15 +43,16 @@ const Home = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [brandCounts, setBrandCounts] = useState({});
+  const [showAllBrands, setShowAllBrands] = useState(false);
+  const [showBrandsSection, setShowBrandsSection] = useState(true);
+  const [showPriceSection, setShowPriceSection] = useState(true);
+  const [showAvailabilitySection, setShowAvailabilitySection] = useState(true);
   const [priceRange, setPriceRange] = useState({
     min: '',
     max: ''
   });
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [availabilityFilter, setAvailabilityFilter] = useState({
-    availableNow: false,
-    availableLater: false
-  });
+  const [availabilityFilter, setAvailabilityFilter] = useState('all'); // 'all', 'now', or 'later'
 
   useEffect(() => {
     fetchMotorsAndSellers();
@@ -98,21 +103,21 @@ const Home = () => {
     }
   };
 
-const getAvailableCounts = () => {
-  const availableNowCount = filteredMotors.filter(motor => motor.current_status === 'available').length;
-  const availableLaterCount = filteredMotors.filter(motor => motor.current_status === 'booked').length;
-  return { availableNowCount, availableLaterCount };
-};
+  const getAvailableCounts = () => {
+    const availableNowCount = filteredMotors.filter(motor => motor.current_status === 'available').length;
+    const availableLaterCount = filteredMotors.filter(motor => motor.current_status === 'booked').length;
+    return { availableNowCount, availableLaterCount };
+  };
 
-const filteredMotors = motors.filter(motor => {
+  const filteredMotors = motors.filter(motor => {
     const matchesSearch = motor.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPrice = (!priceRange.min || motor.dailyRate >= Number(priceRange.min)) &&
                         (!priceRange.max || motor.dailyRate <= Number(priceRange.max));
     const matchesBrand = selectedCategories.length === 0 || selectedCategories.includes(motor.brand);
     const matchesAvailability = 
-      (!availabilityFilter.availableNow && !availabilityFilter.availableLater) ||
-      (availabilityFilter.availableNow && motor.current_status === 'available') ||
-      (availabilityFilter.availableLater && motor.current_status === 'booked');
+      availabilityFilter === 'all' ||
+      (availabilityFilter === 'now' && motor.current_status === 'available') ||
+      (availabilityFilter === 'later' && motor.current_status === 'booked');
     
     return matchesSearch && matchesPrice && matchesBrand && matchesAvailability;
   });
@@ -166,97 +171,157 @@ const filteredMotors = motors.filter(motor => {
           {/* Filter Sidebar */}
           <Grid item xs={12} md={2.5}>
             <Paper sx={{ p: 1.5, borderRadius: 1 }}>
-              <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600 }}>
-                Brands
-              </Typography>
-              <List>
-                {Object.entries(brandCounts).map(([brand, count]) => (
-                  <ListItem key={brand} dense sx={{ pl: 0 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox 
-                          checked={selectedCategories.includes(brand)}
-                          onChange={() => setSelectedCategories(prev => 
-                            prev.includes(brand)
-                              ? prev.filter(b => b !== brand)
-                              : [...prev, brand]
-                          )}
-                        />
-                      }
-                      label={
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                          <Typography>{brand}</Typography>
-                          <Typography color="text.secondary">{count}</Typography>
-                        </Box>
-                      }
-                      sx={{ width: '100%' }}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-
-              <Divider sx={{ my: 2 }} />
-
-              <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600 }}>
-                Price (MAD)
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                <TextField
-                  placeholder="Min"
-                  size="small"
-                  fullWidth
-                  value={priceRange.min}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, min: e.target.value }))}
-                />
-                <Typography sx={{ mx: 1 }}>-</Typography>
-                <TextField
-                  placeholder="Max"
-                  size="small"
-                  fullWidth
-                  value={priceRange.max}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, max: e.target.value }))}
-                />
+              {/* Brands Section */}
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  mb: 1.5
+                }}
+                onClick={() => setShowBrandsSection(!showBrandsSection)}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Brands ({Object.keys(brandCounts).length})
+                </Typography>
+                {showBrandsSection ? <ExpandLessIcon /> : <ExpandMoreIcon />}
               </Box>
+              {showBrandsSection && (
+                <>
+                  <List>
+                    {Object.entries(brandCounts)
+                      .slice(0, showAllBrands ? undefined : 4)
+                      .map(([brand, count]) => (
+                      <ListItem key={brand} dense sx={{ pl: 0 }}>
+                        <FormControlLabel
+                          control={
+                            <Checkbox 
+                              checked={selectedCategories.includes(brand)}
+                              onChange={() => setSelectedCategories(prev => 
+                                prev.includes(brand)
+                                  ? prev.filter(b => b !== brand)
+                                  : [...prev, brand]
+                              )}
+                            />
+                          }
+                          label={
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                          <Typography>{brand} ({count})</Typography>
+                            </Box>
+                          }
+                          sx={{ width: '100%' }}
+                        />
+                      </ListItem>
+                    ))}
+                    {Object.keys(brandCounts).length > 4 && (
+                      <ListItem dense sx={{ pl: 0, justifyContent: 'center' }}>
+                        <Button
+                          onClick={() => setShowAllBrands(!showAllBrands)}
+                          sx={{ 
+                            textTransform: 'none',
+                            color: 'primary.main',
+                            '&:hover': {
+                              background: 'none',
+                              textDecoration: 'underline'
+                            }
+                          }}
+                        >
+                          {showAllBrands ? 'MASQUER' : `AFFICHER TOUS (${Object.keys(brandCounts).length - 4})`}
+                        </Button>
+                      </ListItem>
+                    )}
+                  </List>
+                  <Divider sx={{ my: 2 }} />
+                </>
+              )}
 
-              <Divider sx={{ my: 2 }} />
+              {/* Price Section */}
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  mb: 1.5
+                }}
+                onClick={() => setShowPriceSection(!showPriceSection)}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Price (MAD)
+                </Typography>
+                {showPriceSection ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </Box>
+              {showPriceSection && (
+                <>
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                    <TextField
+                      placeholder="Min"
+                      size="small"
+                      fullWidth
+                      value={priceRange.min}
+                      onChange={(e) => setPriceRange(prev => ({ ...prev, min: e.target.value }))}
+                    />
+                    <Typography sx={{ mx: 1 }}>-</Typography>
+                    <TextField
+                      placeholder="Max"
+                      size="small"
+                      fullWidth
+                      value={priceRange.max}
+                      onChange={(e) => setPriceRange(prev => ({ ...prev, max: e.target.value }))}
+                    />
+                  </Box>
+                  <Divider sx={{ my: 2 }} />
+                </>
+              )}
 
-              <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600 }}>
-                Availability
-              </Typography>
-              <FormGroup>
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={availabilityFilter.availableNow}
-                      onChange={() => setAvailabilityFilter(prev => ({
-                        ...prev,
-                        availableNow: !prev.availableNow
-                      }))}
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                      <Typography>Available Now</Typography>
-                    </Box>
-                  }
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={availabilityFilter.availableLater}
-                      onChange={() => setAvailabilityFilter(prev => ({
-                        ...prev,
-                        availableLater: !prev.availableLater
-                      }))}
-                    />
-                  }
-                  label={
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                      <Typography>Available Later</Typography>
-                    </Box>
-                  }
-                />
-              </FormGroup>
+              {/* Availability Section */}
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  mb: 1.5
+                }}
+                onClick={() => setShowAvailabilitySection(!showAvailabilitySection)}
+              >
+                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                  Availability 
+                </Typography>
+                {showAvailabilitySection ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </Box>
+              {showAvailabilitySection && (
+                <RadioGroup
+                  value={availabilityFilter}
+                  onChange={(e) => setAvailabilityFilter(e.target.value)}
+                >
+                  <FormControlLabel
+                    value="now"
+                    control={<Radio />}
+                    label={
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <Typography>Available Now</Typography>
+                        <Typography color="text.secondary">
+                          ({motors.filter(m => m.current_status === 'available').length})
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <FormControlLabel
+                    value="later"
+                    control={<Radio />}
+                    label={
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <Typography>Available Later</Typography>
+                        <Typography color="text.secondary">
+                          ({motors.filter(m => m.current_status === 'booked').length})
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                </RadioGroup>
+              )}
             </Paper>
           </Grid>
 
@@ -407,15 +472,17 @@ const filteredMotors = motors.filter(motor => {
                 </Grid>
               ))}
             </Grid>
+            {filteredMotors.length === 0 && !loading && (
+              <Grid item xs={12}>
+                <Box sx={{ textAlign: 'center', mt: 4, width: '100%' }}>
+                  <Typography variant="h6" color="text.secondary">
+                    No motorcycles found
+                  </Typography>
+                </Box>
+              </Grid>
+            )}
           </Grid>
         </Grid>
-{filteredMotors.length === 0 && !loading && (
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Typography variant="h6" color="text.secondary">
-              No motorcycles found
-            </Typography>
-          </Box>
-        )}
       </Container>
     </Box>
   );

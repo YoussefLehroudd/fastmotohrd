@@ -421,17 +421,33 @@ const Seller = () => {
                   </Grid>
                 ))}
               </Grid>
-              <Fab 
-                color="primary" 
+              <Stack 
                 sx={{ 
-                  position: 'fixed',
-                  bottom: 32,
-                  right: 32
+                  position: 'fixed', 
+                  bottom: 90, 
+                  right: 16, 
+                  zIndex: 999,
+                  flexDirection: 'row'
                 }}
-                onClick={() => handleOpen()}
+                spacing={2}
               >
-                <AddIcon />
-              </Fab>
+                <Fab 
+                  color="primary" 
+                  onClick={() => handleOpen()}
+                  aria-label="add motor"
+                >
+                  <AddIcon />
+                </Fab>
+                {selectedMotorId && (
+                  <Fab 
+                    color="secondary" 
+                    onClick={() => setSelectedTab(5)}
+                    aria-label="add location"
+                  >
+                    <CalendarIcon />
+                  </Fab>
+                )}
+              </Stack>
             </>
           )}
           {selectedTab === 5 && selectedMotorId && (
