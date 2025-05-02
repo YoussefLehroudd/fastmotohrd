@@ -47,7 +47,8 @@ const MessageContainer = styled(Box)({
   overflowY: 'auto',
   padding: '20px',
   display: 'flex',
-  flexDirection: 'column'
+  flexDirection: 'column-reverse',
+  height: '100%'
 });
 
 const MessageWrapper = styled(Box)({
@@ -283,11 +284,6 @@ const AdminChat = () => {
     return () => newSocket.close();
   }, [user]);
 
-  useEffect(() => {
-    if (selectedRoom?.messages?.length > 0) {
-      scrollToBottom();
-    }
-  }, [selectedRoom?.messages]);
 
   // Listen for unread count updates
   useEffect(() => {
@@ -351,7 +347,9 @@ const AdminChat = () => {
     });
 
     setMessage('');
-    scrollToBottom();
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
 
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
@@ -452,7 +450,13 @@ const AdminChat = () => {
               </Box>
 
               <MessageContainer>
-                {selectedRoom.messages?.map((msg, index) => (
+                <div ref={messagesEndRef} />
+                {isTyping[selectedRoom.id] && (
+                  <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', ml: 1 }}>
+                    User is typing...
+                  </Box>
+                )}
+                {[...(selectedRoom.messages || [])].reverse().map((msg, index) => (
                   <MessageWrapper key={msg.id || index} sx={{ justifyContent: msg.sender_id === user.id ? 'flex-end' : 'flex-start' }}>
                     <Message isOwn={msg.sender_id === user.id}>
                       <Typography variant="body2" color="textSecondary" gutterBottom>
@@ -478,12 +482,6 @@ const AdminChat = () => {
                     )}
                   </MessageWrapper>
                 ))}
-                {isTyping[selectedRoom.id] && (
-                  <Box sx={{ fontSize: '0.8rem', color: 'text.secondary', ml: 1 }}>
-                    User is typing...
-                  </Box>
-                )}
-                <div ref={messagesEndRef} />
               </MessageContainer>
 
               <Box component="form" onSubmit={handleSend} sx={{ p: 2, borderTop: 1, borderColor: 'divider', display: 'flex', gap: 1 }}>
