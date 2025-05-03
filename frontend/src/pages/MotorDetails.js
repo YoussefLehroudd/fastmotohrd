@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Slider from 'react-slick';
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 import {
   Container,
   Paper,
@@ -22,7 +25,9 @@ import {
   CalendarMonth as CalendarIcon,
   AttachMoney as MoneyIcon,
   DirectionsBike as BikeIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext';
@@ -392,11 +397,48 @@ const MotorDetails = () => {
           <Typography variant="h5" gutterBottom>
             Similar Motorcycles
           </Typography>
-          <Grid container spacing={3}>
+          <Box sx={{ 
+            mt: 2,
+            position: 'relative',
+            '&:hover .slick-arrow': {
+              opacity: 1,
+              visibility: 'visible'
+            },
+            '& .slick-arrow': {
+              width: 40,
+              height: 40,
+              background: '#1976d2',
+              borderRadius: '50%',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              zIndex: 1,
+              opacity: 0,
+              visibility: 'hidden',
+              transition: 'all 0.3s ease',
+              color: 'white',
+              cursor: 'pointer',
+              '&:hover': {
+                background: '#1565c0',
+                opacity: 1,
+                color: 'white'
+              },
+              '&::before': {
+                opacity: 1,
+                color: 'white',
+                fontSize: '24px'
+              }
+            },
+            '& .slick-prev': {
+              left: -50,
+            },
+            '& .slick-next': {
+              right: -50,
+            },
+            '& .slick-disabled': {
+              opacity: 0.5
+            }
+          }}>
             {motors.length === 0 ? (
-              <Grid item xs={12}>
-                <Alert severity="info">Loading similar motorcycles...</Alert>
-              </Grid>
+              <Alert severity="info">Loading similar motorcycles...</Alert>
             ) : (
               <>
                 {(function() {
@@ -420,19 +462,86 @@ const MotorDetails = () => {
                     return score;
                   };
 
-                  // Sort by similarity score
+                  // Sort by similarity score (without limiting to 3)
                   const similarMotors = otherMotors
                     .map(m => ({ ...m, similarityScore: getSimilarityScore(m) }))
                     .filter(m => m.similarityScore > 0)
-                    .sort((a, b) => b.similarityScore - a.similarityScore)
-                    .slice(0, 3);
+                    .sort((a, b) => b.similarityScore - a.similarityScore);
+
+                  const settings = {
+                    dots: true,
+                    infinite: true,
+                    speed: 1000,
+                    slidesToShow: 3,
+                    slidesToScroll: 1,
+                    autoplay: true,
+                    autoplaySpeed: 4000,
+                    pauseOnHover: true,
+                    cssEase: "linear",
+                    arrows: true,
+                    nextArrow: <ChevronRightIcon sx={{ 
+                      fontSize: 40, 
+                      color: '#1976d2', 
+                      position: 'absolute', 
+                      right: '-50px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderRadius: '50%',
+                      padding: '8px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      '&:hover': { 
+                        transform: 'translateY(-50%) scale(1.1)',
+                        backgroundColor: 'rgba(255, 255, 255, 1)',
+                      }
+                    }} />,
+                    prevArrow: <ChevronLeftIcon sx={{ 
+                      fontSize: 40, 
+                      color: '#1976d2', 
+                      position: 'absolute', 
+                      left: '-50px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderRadius: '50%',
+                      padding: '8px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      '&:hover': { 
+                        transform: 'translateY(-50%) scale(1.1)',
+                        backgroundColor: 'rgba(255, 255, 255, 1)',
+                      }
+                    }} />,
+                    responsive: [
+                      {
+                        breakpoint: 1024,
+                        settings: {
+                          slidesToShow: 2,
+                          slidesToScroll: 1,
+                          arrows: true
+                        }
+                      },
+                      {
+                        breakpoint: 600,
+                        settings: {
+                          slidesToShow: 1,
+                          slidesToScroll: 1,
+                          arrows: false,
+                          dots: true
+                        }
+                      }
+                    ]
+                  };
 
                   return similarMotors.length === 0 ? (
-                    <Grid item xs={12}>
-                      <Alert severity="info">No similar motorcycles found</Alert>
-                    </Grid>
-                  ) : similarMotors.map((similarMotor) => (
-                    <Grid item xs={12} sm={6} md={4} key={similarMotor.id}>
+                    <Alert severity="info">No similar motorcycles found</Alert>
+                  ) : (
+                    <Slider {...settings}>
+                      {similarMotors.map((similarMotor) => (
+                        <Box key={similarMotor.id} sx={{ p: 1 }}>
                       <Card 
                         sx={{ 
                           cursor: 'pointer',
@@ -546,12 +655,14 @@ const MotorDetails = () => {
                           </Stack>
                         </CardContent>
                       </Card>
-                    </Grid>
-                  ))
+                        </Box>
+                      ))}
+                    </Slider>
+                  )
                 })()}
               </>
             )}
-          </Grid>
+          </Box>
         </Box>
 
         {/* Reviews Section */}
