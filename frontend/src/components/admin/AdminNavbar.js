@@ -19,6 +19,8 @@ import {
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
   Chat as ChatIcon,
+  Payment as PaymentIcon,
+  AccountBalance as BankIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useUser } from '../../context/UserContext';
@@ -37,7 +39,9 @@ const AdminNavbar = ({ activeTab, setActiveTab }) => {
     { text: 'Users', icon: <PeopleIcon />, index: 1 },
     { text: 'Motors', icon: <MotorIcon />, index: 2 },
     { text: 'Bookings', icon: <BookingIcon />, index: 3 },
-    { text: 'Chat', icon: <ChatIcon />, index: 4 },
+    { text: 'Bank Details', icon: <BankIcon />, index: 4 },
+    { text: 'Subscriptions', icon: <PaymentIcon />, index: 5 },
+    { text: 'Chat', icon: <ChatIcon />, index: 6 }
   ];
 
   const handleLogout = async () => {

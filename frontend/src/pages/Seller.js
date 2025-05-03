@@ -41,6 +41,7 @@ import SellerDashboard from '../components/SellerDashboard';
 import SellerOrders from '../components/SellerOrders';
 import SellerPayments from '../components/SellerPayments';
 import SellerReviews from '../components/SellerReviews';
+import SellerSubscription from '../components/SellerSubscription';
 
 const Seller = () => {
   const [motors, setMotors] = useState([]);
@@ -165,6 +166,7 @@ const Seller = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError({ show: false, message: '' });
     try {
       const url = editMode 
         ? `http://localhost:5000/api/motors/${currentMotor.id}`
@@ -194,7 +196,21 @@ const Seller = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save motor');
+        const data = await response.json();
+        if (data.requiresSubscription) {
+          setError({ 
+            show: true, 
+            message: data.message,
+            requiresSubscription: true 
+          });
+          // Redirect to subscription tab after 3 seconds
+          setTimeout(() => {
+            setSelectedTab(6);
+            handleClose();
+          }, 3000);
+          return;
+        }
+        throw new Error(data.message || 'Failed to save motor');
       }
 
       setSuccess({
@@ -262,6 +278,7 @@ const Seller = () => {
             <Tab label="Reviews" />
             <Tab label="My Motors" />
             <Tab label="Add Location" disabled={!selectedMotorId} />
+            <Tab label="Subscription" />
           </Tabs>
 
           <Snackbar
@@ -470,6 +487,7 @@ const Seller = () => {
           {selectedTab === 5 && selectedMotorId && (
             <MotorLocations motorId={selectedMotorId} />
           )}
+          {selectedTab === 6 && <SellerSubscription />}
         </Box>
 
         <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const subscriptionRoutes = require('./admin/subscriptions');
 const db = require('../db');
 const { authenticateAdmin } = require('../middleware/auth');
 
@@ -418,5 +419,9 @@ router.get('/bookings', authenticateAdmin, async (req, res) => {
     });
   }
 });
+
+// Mount subscription and bank details routes
+router.use('/subscriptions', subscriptionRoutes);
+router.use('/bank-details', require('./admin/bank-details'));
 
 module.exports = router;

@@ -22,6 +22,8 @@ import UserManagement from '../components/admin/UserManagement';
 import MotorManagement from '../components/admin/MotorManagement';
 import BookingManagement from '../components/admin/BookingManagement';
 import AdminChat from '../components/admin/AdminChat';
+import SubscriptionManagement from '../components/admin/SubscriptionManagement';
+import BankDetailsManagement from '../components/admin/BankDetailsManagement';
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -322,6 +324,10 @@ const Admin = () => {
           />
         );
       case 4:
+        return <BankDetailsManagement />;
+      case 5:
+        return <SubscriptionManagement />;
+      case 6:
         return <AdminChat />;
       default:
         return null;

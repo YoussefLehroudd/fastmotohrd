@@ -56,7 +56,6 @@ const initializeSocket = (socketIo) => {
 
 const handleConnection = async (socket) => {
   const userId = socket.user.id;
-  console.log('User connected:', userId);
 
   // Store connection and update status
   connectedUsers.set(userId, socket);
@@ -198,7 +197,7 @@ const handleConnection = async (socket) => {
   // Handle new message
   socket.on('send_message', async (data) => {
     try {
-      const { roomId, message, isOpen } = data; // Get isOpen from frontend
+      const { roomId, message, isOpen } = data;
       if (!roomId || !message) {
         throw new Error('Room ID and message are required');
       }
@@ -230,9 +229,9 @@ const handleConnection = async (socket) => {
           userId, 
           userType, 
           message,
-          userType === 'admin', // admin messages are read by admin
-          userType === 'seller', // seller messages are read by seller
-          userType === 'user' // user messages are read by user
+          userType === 'admin',
+          userType === 'seller',
+          userType === 'user'
         ]);
 
         // Get sender info
@@ -249,9 +248,9 @@ const handleConnection = async (socket) => {
           sender_name: sender[0].username,
           message: message,
           created_at: new Date(),
-            admin_read: userType === 'admin',
-            seller_read: userType === 'seller',
-            user_read: userType === 'user'
+          admin_read: userType === 'admin',
+          seller_read: userType === 'seller',
+          user_read: userType === 'user'
         };
 
         // Send message to appropriate rooms
@@ -305,7 +304,7 @@ const handleConnection = async (socket) => {
           // Send to admin room with unread status
           io.to('admin_room').emit('new_message', {
             ...messageData,
-            admin_read: false,  // Always unread for admin until they open the chat
+            admin_read: false,
             seller_read: userType === 'seller',
             user_read: userType === 'user',
             unread_count: unreadCount
@@ -418,7 +417,6 @@ const handleConnection = async (socket) => {
 
   socket.on('disconnect', () => {
     const userId = socket.user.id;
-    console.log('User disconnected:', userId);
     connectedUsers.delete(userId);
     updateUserStatus(userId, false);
   });

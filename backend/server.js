@@ -601,7 +601,8 @@ app.get('/api/motors', async (req, res) => {
   }
 });
 
-app.post('/api/motors', verifyToken, upload.single('image'), async (req, res) => {
+const checkSubscription = require('./middleware/checkSubscription');
+app.post('/api/motors', verifyToken, checkSubscription, upload.single('image'), async (req, res) => {
   try {
     const [user] = await db.query('SELECT id FROM users WHERE id = ?', [req.user.id]);
     if (!user.length) {
@@ -814,6 +815,7 @@ const bookingsRoutes = require('./routes/bookings');
 const notificationsRoutes = require('./routes/notifications');
 const reviewsRoutes = require('./routes/reviews_updated');
 const paymentsRoutes = require('./routes/payments');
+const subscriptionRoutes = require('./routes/subscriptions');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
@@ -830,6 +832,7 @@ app.use('/api/motors/:motorId/reviews', (req, res, next) => {
   next();
 }, reviewsRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin', require('./routes/admin/chat'));
 app.use('/api/tracking', require('./routes/tracking'));
@@ -872,21 +875,6 @@ const startServer = async () => {
     db = await initializeDatabase();
     console.log('Database initialized successfully');
 
-    // Log all IP-related information
-    app.use((req, res, next) => {
-      try {
-        console.log('=== IP ADDRESS INFORMATION ===');
-        console.log('x-forwarded-for:', req.headers['x-forwarded-for']);
-        console.log('x-real-ip:', req.headers['x-real-ip']);
-        console.log('x-client-ip:', req.headers['x-client-ip']);
-        console.log('remoteAddress:', req.connection.remoteAddress);
-        console.log('socket remoteAddress:', req.socket.remoteAddress);
-        console.log('=== END IP INFO ===');
-      } catch (error) {
-        console.error('Error tracking visitor country:', error);
-      }
-      next();
-    });
 
     const tryPort = async (port) => {
       try {
