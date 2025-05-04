@@ -306,6 +306,72 @@ const sendNewBookingEmail = async (recipientEmail, { bookingId, motorName, start
   }
 };
 
+const sendSubscriptionEmail = async (email, { type, planName, endDate, price, duration, maxListings }) => {
+  let subject, title, message;
+  
+  switch (type) {
+    case 'requested':
+      subject = 'Subscription Request Received';
+      title = 'Subscription Request Submitted';
+      message = `Your request for the ${planName} subscription has been submitted successfully. Our support team will review your request and activate your subscription once payment is confirmed.`;
+      break;
+    case 'approved':
+      subject = 'Subscription Activated Successfully';
+      title = 'Subscription Activated';
+      message = `Your ${planName} subscription has been activated successfully. You can now start listing your motorcycles.`;
+      break;
+    case 'expired':
+      subject = 'Subscription Expired';
+      title = 'Subscription Expired';
+      message = `Your ${planName} subscription has expired. Please renew your subscription to continue listing motorcycles.`;
+      break;
+   
+  }
+
+  const mailOptions = {
+    from: {
+      name: 'FastMoto',
+      address: process.env.EMAIL_USER
+    },
+    to: email,
+    subject: `FastMoto - ${subject}`,
+    html: `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">
+        <div style="background-color: #1a237e; color: white; padding: 30px 20px; text-align: center;">
+          <div style="margin-bottom: 15px;">
+            <img src="https://fonts.gstatic.com/s/e/notoemoji/16.0/1f3cd_fe0f/32.png" alt="🏍️" style="width: 32px; height: 32px;">
+          </div>
+          <div style="font-size: 24px; font-weight: bold;">FastMoto</div>
+          <div style="margin-top: 5px;">Your Premium Motorcycle Marketplace</div>
+        </div>
+        <div style="padding: 30px 20px; text-align: center;">
+          <h2 style="color: #1a237e; margin-bottom: 20px;">${title}</h2>
+          <p style="color: #666; margin-bottom: 20px;">${message}</p>
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 4px; margin: 20px 0; text-align: left;">
+            <p style="color: #666; margin: 5px 0;"><strong>Plan:</strong> ${planName}</p>
+            <p style="color: #666; margin: 5px 0;"><strong>Price:</strong> ${price} MAD</p>
+            <p style="color: #666; margin: 5px 0;"><strong>Duration:</strong> ${duration}</p>
+            <p style="color: #666; margin: 5px 0;"><strong>Maximum Listings:</strong> Up to ${maxListings} listings</p>
+            ${endDate ? `<p style="color: #666; margin: 5px 0;"><strong>End Date:</strong> ${new Date(endDate).toLocaleDateString()}</p>` : ''}
+          </div>
+        </div>
+        <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center; color: #666; font-size: 12px;">
+          <p style="margin: 5px 0;">© ${new Date().getFullYear()} FastMoto. All rights reserved.</p>
+          <p style="margin: 5px 0;">This is an automated email, please do not reply.</p>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('Email sending error:', error);
+    return false;
+  }
+};
+
 module.exports = {
   generateOTP,
   sendLoginOTP,
@@ -313,5 +379,6 @@ module.exports = {
   sendPasswordChangeNotification,
   sendBookingCancellationEmail,
   sendBookingStatusEmail,
-  sendNewBookingEmail
+  sendNewBookingEmail,
+  sendSubscriptionEmail
 };

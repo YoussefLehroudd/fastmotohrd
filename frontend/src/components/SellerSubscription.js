@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { io } from 'socket.io-client';
 import {
   Box,
   Card,
@@ -25,43 +26,149 @@ const SellerSubscription = () => {
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState({ show: false, message: '' });
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch subscription plans
-        const plansResponse = await fetch('http://localhost:5000/api/subscriptions/plans', {
+  const fetchSubscriptionData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch subscription data in parallel
+      const [plansResponse, subscriptionResponse] = await Promise.all([
+        fetch('http://localhost:5000/api/subscriptions/plans', {
           credentials: 'include'
-        });
-        
-        if (!plansResponse.ok) throw new Error('Failed to fetch plans');
-        const plansData = await plansResponse.json();
-        setPlans(plansData);
+        }),
+        fetch('http://localhost:5000/api/subscriptions/current', {
+          credentials: 'include'
+        })
+      ]);
+      
+      if (!plansResponse.ok) throw new Error('Failed to fetch plans');
+      if (!subscriptionResponse.ok) throw new Error('Failed to fetch subscription');
 
-        // Fetch current subscription
-        const subscriptionResponse = await fetch('http://localhost:5000/api/subscriptions/current', {
-          credentials: 'include'
-        });
+      const [plansData, subscriptionData] = await Promise.all([
+        plansResponse.json(),
+        subscriptionResponse.json()
+      ]);
+
+      // Update state with fresh data
+      setPlans(plansData);
+      setCurrentSubscription(subscriptionData);
+      
+      // Clear any previous errors
+      setError(null);
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let socket;
+    let retryCount = 0;
+    const maxRetries = 3;
+    let checkInterval;
+
+    const checkSubscriptionStatus = async () => {
+      const now = new Date();
+      if (currentSubscription) {
+        let isExpired = false;
+        let endDate;
         
-        if (!subscriptionResponse.ok) throw new Error('Failed to fetch subscription');
-        const subscriptionData = await subscriptionResponse.json();
-        setCurrentSubscription(subscriptionData);
-      } catch (error) {
-        console.error('Error:', error);
-        setError(error.message);
-      } finally {
-        setLoading(false);
+        if (currentSubscription.is_trial && currentSubscription.trial_ends_at) {
+          endDate = new Date(currentSubscription.trial_ends_at);
+        } else if (currentSubscription.end_date) {
+          endDate = new Date(currentSubscription.end_date);
+        }
+
+        if (endDate && now >= endDate) {
+          // Update subscription status locally first
+          setCurrentSubscription(prev => ({
+            ...prev,
+            status: 'expired'
+          }));
+          
+          // Then fetch fresh data from server
+          await fetchSubscriptionData();
+        }
       }
     };
 
-    fetchData();
-  }, []);
+    const connectSocket = () => {
+      socket = io('http://localhost:5000', {
+        withCredentials: true,
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 5
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to subscription updates');
+        retryCount = 0;
+        fetchSubscriptionData();
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setTimeout(fetchSubscriptionData, 1000 * retryCount);
+        }
+      });
+
+      socket.on('subscription_update', (data) => {
+        console.log('Subscription updated:', data);
+        
+        // Update subscription status immediately
+        if (data.type === 'expired' && data.subscription) {
+          setCurrentSubscription(prev => ({
+            ...prev,
+            ...data.subscription,
+            status: 'expired'
+          }));
+          
+          setSuccess({
+            show: true,
+            message: 'Your subscription has expired. Please renew to continue using all features.'
+          });
+        } else if (data.type === 'approved') {
+          setCurrentSubscription(prev => ({
+            ...prev,
+            status: 'active'
+          }));
+          
+          setSuccess({
+            show: true,
+            message: 'Your subscription has been approved!'
+          });
+        }
+      });
+    };
+
+    // Initial fetch and socket connection
+    fetchSubscriptionData();
+    connectSocket();
+
+    // Check subscription status every second
+    checkInterval = setInterval(checkSubscriptionStatus, 1000);
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
+    };
+  }, [fetchSubscriptionData]);
 
   const handleSubscribe = async (planId) => {
     try {
+      setLoading(true);
       const response = await fetch('http://localhost:5000/api/subscriptions/request', {
         method: 'POST',
         headers: {
@@ -71,43 +178,64 @@ const SellerSubscription = () => {
         body: JSON.stringify({ planId })
       });
 
-      if (!response.ok) throw new Error('Failed to request subscription');
-      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to request subscription');
+      }
+      
+      // Update subscription state with data from response
+      if (data.subscription) {
+        setCurrentSubscription(data.subscription);
+      }
+      
+      // Show payment details
       setPaymentDetails(data.paymentDetails);
       setOpenDialog(true);
+      
+      // Show success message from response
+      setSuccess({
+        show: true,
+        message: data.message
+      });
     } catch (error) {
       console.error('Error:', error);
       setError(error.message);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
   };
 
   const handleStartTrial = async () => {
     try {
+      setLoading(true);
       const response = await fetch('http://localhost:5000/api/subscriptions/start-trial', {
         method: 'POST',
         credentials: 'include'
       });
 
-      if (!response.ok) throw new Error('Failed to start trial');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to start trial');
+      }
       
-      const data = await response.json();
-      // Refresh current subscription
-      const subscriptionResponse = await fetch('http://localhost:5000/api/subscriptions/current', {
-        credentials: 'include'
+      // Refresh subscription data
+      await fetchSubscriptionData();
+      
+      setSuccess({
+        show: true,
+        message: 'Free trial started successfully!'
       });
-      
-      if (!subscriptionResponse.ok) throw new Error('Failed to fetch subscription');
-      const subscriptionData = await subscriptionResponse.json();
-      setCurrentSubscription(subscriptionData);
     } catch (error) {
       console.error('Error:', error);
       setError(error.message);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
   };
 
   if (loading) {
@@ -126,32 +254,15 @@ const SellerSubscription = () => {
             {error}
           </Alert>
         )}
-
-        {currentSubscription && (
-          <Card sx={{ mb: 4 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Current Subscription
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Typography variant="subtitle1">
-                  Plan: {currentSubscription.plan_name}
-                </Typography>
-                <Chip 
-                  label={currentSubscription.status} 
-                  color={currentSubscription.status === 'active' ? 'success' : 'warning'}
-                />
-              </Box>
-              <Typography variant="body2" color="text.secondary">
-                Listings Used: {currentSubscription.listings_used} / {currentSubscription.max_listings || '∞'}
-              </Typography>
-              {currentSubscription.end_date && (
-                <Typography variant="body2" color="text.secondary">
-                  Expires: {new Date(currentSubscription.end_date).toLocaleDateString()}
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
+        
+        {success.show && (
+          <Alert 
+            severity="success" 
+            sx={{ mb: 3 }}
+            onClose={() => setSuccess({ show: false, message: '' })}
+          >
+            {success.message}
+          </Alert>
         )}
 
         {!currentSubscription && !loading && (
@@ -172,7 +283,67 @@ const SellerSubscription = () => {
           </Box>
         )}
 
-        <Typography variant="h6" gutterBottom>
+        {currentSubscription && (
+          <Card sx={{ mb: 4 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Current Subscription
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <Typography variant="subtitle1">
+                  Plan: {currentSubscription.plan_name}
+                </Typography>
+                <Chip 
+                  label={currentSubscription.status} 
+                  color={
+                    currentSubscription.status === 'active' ? 'success' :
+                    currentSubscription.status === 'pending' ? 'warning' :
+                    'error'
+                  }
+                />
+              </Box>
+              {currentSubscription.status === 'active' && (
+                <Box sx={{ mt: 1, mb: 2 }}>
+                  {(() => {
+                    const now = new Date();
+                    const endDate = new Date(currentSubscription.is_trial ? 
+                      currentSubscription.trial_ends_at : 
+                      currentSubscription.end_date
+                    );
+                    const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysLeft <= 7 && daysLeft > 0) {
+                      return (
+                        <Alert severity="warning" sx={{ mt: 1 }}>
+                          Your subscription will expire in {daysLeft} day{daysLeft !== 1 ? 's' : ''}. 
+                          Please renew to continue using all features.
+                        </Alert>
+                      );
+                    }
+                    return null;
+                  })()}
+                </Box>
+              )}
+              <Typography variant="body2" color="text.secondary">
+                Listings Used: {currentSubscription.listings_used} / {currentSubscription.max_listings || '∞'}
+              </Typography>
+              {currentSubscription.end_date && (
+                <Typography variant="body2" color="text.secondary">
+                  Expires: {new Date(currentSubscription.end_date).toLocaleDateString()}
+                </Typography>
+              )}
+              {currentSubscription.is_trial === 1 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    You are currently on a free trial. You can upgrade to a paid plan at any time.
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <Typography variant="h6" sx={{ mb: 3 }}>
           Available Plans
         </Typography>
         <Grid container spacing={3}>
@@ -198,10 +369,20 @@ const SellerSubscription = () => {
                     onClick={() => handleSubscribe(plan.id)}
                     disabled={currentSubscription?.plan_id === plan.id}
                     sx={{
-                      backgroundColor: currentSubscription?.plan_id === plan.id ? '#e0e0e0' : undefined
+                      backgroundColor: currentSubscription?.plan_id === plan.id ? 
+                        currentSubscription.status === 'pending' ? '#ffa726' : '#e0e0e0' 
+                        : undefined,
+                      pointerEvents: currentSubscription?.plan_id === plan.id ? 'none' : 'auto',
+                      '&:hover': {
+                        backgroundColor: currentSubscription?.plan_id === plan.id ? 
+                          currentSubscription.status === 'pending' ? '#ffa726' : '#e0e0e0' 
+                          : undefined
+                      }
                     }}
                   >
-                    {currentSubscription?.plan_id === plan.id ? 'CURRENT PLAN' : 'SUBSCRIBE'}
+                    {currentSubscription?.plan_id === plan.id ? 
+                      currentSubscription.status === 'pending' ? 'PENDING' : 'CURRENT PLAN' 
+                      : 'SUBSCRIBE'}
                   </Button>
                 </CardContent>
               </Card>

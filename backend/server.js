@@ -38,6 +38,9 @@ const { generateOTP, sendLoginOTP, sendPasswordResetOTP, sendPasswordChangeNotif
 dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 
+// Start subscription expiry checker
+require('./check-expired-subscriptions');
+
 app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 app.use(cors({ 
   origin: 'http://localhost:3000', 
@@ -737,73 +740,73 @@ app.delete('/api/motors/:id', verifyToken, async (req, res) => {
   }
 });
 
-// Google OAuth routes
-// app.post('/api/auth/google', async (req, res) => {
-//   try {
-//     const { token } = req.body;
-//     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-    
-//     const ticket = await client.verifyIdToken({
-//       idToken: token,
-//       audience: process.env.GOOGLE_CLIENT_ID
-//     });
-    
-//     const payload = ticket.getPayload();
-//     const googleId = payload['sub'];
-//     const email = payload['email'];
-//     const name = payload['name'];
-
-//     // Check if user exists
-//     let [user] = await db.query(
-//       'SELECT * FROM users WHERE google_id = ? OR email = ?',
-//       [googleId, email]
-//     );
-
-//     if (user.length === 0) {
-//       // Create new user
-//       const [result] = await db.query(
-//         'INSERT INTO users (username, email, google_id, google_email, role) VALUES (?, ?, ?, ?, ?)',
-//         [name, email, googleId, email, 'user']
-//       );
-//       [user] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-//     } else {
-//       // Update existing user's Google info if not set
-//       if (!user[0].google_id) {
-//         await db.query(
-//           'UPDATE users SET google_id = ?, google_email = ? WHERE id = ?',
-//           [googleId, email, user[0].id]
-//         );
-//       }
-//     }
-
-//     // Generate JWT token
-//     const jwtToken = jwt.sign(
-//       { id: user[0].id, role: user[0].role },
-//       process.env.JWT_SECRET
-//     );
-
-//     res.cookie('token', jwtToken, {
-//       httpOnly: true,
-//       secure: process.env.NODE_ENV === 'production',
-//       sameSite: 'Strict',
-//       maxAge: 24 * 60 * 60 * 1000 // 24 hours
-//     }).json({
-//       message: 'Google authentication successful',
-//       user: {
-//         id: user[0].id,
-//         username: user[0].username,
-//         email: user[0].email,
-//         role: user[0].role
-//       }
-//     });
-//   } catch (error) {
-//     console.error('Google authentication error:', error);
-//     res.status(500).json({ message: 'Failed to authenticate with Google' });
-//   }
-// });
-
 // Initialize socket service
 const { initializeSocket } = require('./utils/socketService');
+
+// Check for expired subscriptions every minute
+setInterval(async () => {
+  try {
+    // Update expired subscriptions
+    await db.query(`
+      UPDATE seller_subscriptions
+      SET status = 'expired'
+      WHERE (
+        (status = 'active' AND end_date IS NOT NULL AND end_date <= CURRENT_TIMESTAMP)
+        OR
+        (status = 'active' AND is_trial = true AND trial_ends_at <= CURRENT_TIMESTAMP)
+      )
+    `);
+
+    // Get newly expired subscriptions with all details
+    const [expiredSubs] = await db.query(`
+      SELECT s.*, p.name as plan_name, p.price, p.duration_months, p.max_listings, u.email
+      FROM seller_subscriptions s
+      JOIN subscription_plans p ON s.plan_id = p.id
+      JOIN users u ON s.seller_id = u.id
+      WHERE s.status = 'expired'
+      AND NOT EXISTS (
+        SELECT 1 FROM notifications n 
+        WHERE n.userId = s.seller_id 
+        AND n.type = 'subscription_expired'
+        AND JSON_EXTRACT(n.content, '$.subscription_id') = s.id
+      )
+    `);
+
+    // Insert notifications for newly expired subscriptions
+    for (const sub of expiredSubs) {
+      await db.query(`
+        INSERT INTO notifications (userId, type, content, created_at)
+        VALUES (?, 'subscription_expired', ?, CURRENT_TIMESTAMP)
+      `, [
+        sub.seller_id,
+        JSON.stringify({
+          subscription_id: sub.id,
+          plan_name: sub.plan_name,
+          expired_at: sub.is_trial ? sub.trial_ends_at : sub.end_date
+        })
+      ]);
+
+      // Send email notification
+      const { sendSubscriptionEmail } = require('./utils/emailService');
+      await sendSubscriptionEmail(sub.email, {
+        type: 'expired',
+        planName: sub.plan_name,
+        price: sub.price,
+        duration: sub.duration_months === 1 ? '1 month' : `${sub.duration_months} months`,
+        maxListings: sub.max_listings
+      });
+
+      // Emit socket event to notify seller
+      const io = require('./utils/socketService').getIO();
+      io.to(`seller_${sub.seller_id}`).emit('subscription_update', {
+        type: 'expired',
+        subscription: sub
+      });
+    }
+  } catch (error) {
+    console.error('Error checking subscriptions:', error);
+  }
+}, 60000); // Check every minute
 
 // Register all routes
 const authRoutes = require('./routes/auth');

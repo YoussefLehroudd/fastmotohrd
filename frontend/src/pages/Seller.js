@@ -50,6 +50,8 @@ const Seller = () => {
   const [currentMotor, setCurrentMotor] = useState(null);
   const [selectedTab, setSelectedTab] = useState(0);
   const [selectedMotorId, setSelectedMotorId] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [motorToDelete, setMotorToDelete] = useState(null);
   const [formData, setFormData] = useState({});
   const [error, setError] = useState({ show: false, message: '' });
   const [success, setSuccess] = useState({ show: false, message: '' });
@@ -227,27 +229,33 @@ const Seller = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this motor?')) {
-      try {
-        const response = await fetch(`http://localhost:5000/api/motors/${id}`, {
-          method: 'DELETE',
-          credentials: 'include'
-        });
+  const handleDeleteClick = (motor) => {
+    setMotorToDelete(motor);
+    setDeleteDialogOpen(true);
+  };
 
-        if (!response.ok) {
-          throw new Error('Failed to delete motor');
-        }
+  const handleDeleteConfirm = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/motors/${motorToDelete.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
 
-        setSuccess({
-          show: true,
-          message: 'Motor deleted successfully!'
-        });
-        fetchMotors();
-      } catch (error) {
-        console.error('Error deleting motor:', error);
-    setError({ show: true, message: 'Failed to delete motor' });
+      if (!response.ok) {
+        throw new Error('Failed to delete motor');
       }
+
+      setSuccess({
+        show: true,
+        message: 'Motor deleted successfully!'
+      });
+      fetchMotors();
+    } catch (error) {
+      console.error('Error deleting motor:', error);
+      setError({ show: true, message: 'Failed to delete motor' });
+    } finally {
+      setDeleteDialogOpen(false);
+      setMotorToDelete(null);
     }
   };
 
@@ -430,7 +438,7 @@ const Seller = () => {
                             <EditIcon />
                           </IconButton>
                           <IconButton 
-                            onClick={() => handleDelete(motor.id)}
+                          onClick={() => handleDeleteClick(motor)}
                             color="error"
                             size="small"
                           >
@@ -489,6 +497,23 @@ const Seller = () => {
           )}
           {selectedTab === 6 && <SellerSubscription />}
         </Box>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          aria-labelledby="delete-dialog-title"
+        >
+          <DialogTitle id="delete-dialog-title">
+            Are you sure you want to delete this motor?
+          </DialogTitle>
+          <DialogActions>
+            <Button onClick={() => setDeleteDialogOpen(false)}>Annuler</Button>
+            <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+              OK
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
           <DialogTitle>{editMode ? 'Edit Motor' : 'Add New Motor'}</DialogTitle>

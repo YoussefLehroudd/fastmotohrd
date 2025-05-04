@@ -3,6 +3,21 @@ const router = express.Router();
 const db = require('../config/db');
 const { verifyToken } = require('../middleware/auth');
 
+// Get trial status
+router.get('/trial-status', verifyToken, async (req, res) => {
+  try {
+    const [trialStatus] = await db.query(
+      'SELECT COUNT(*) as count FROM seller_subscriptions WHERE seller_id = ? AND is_trial_used = true',
+      [req.user.id]
+    );
+    
+    res.json({ trialUsed: trialStatus[0].count > 0 });
+  } catch (error) {
+    console.error('Error fetching trial status:', error);
+    res.status(500).json({ message: 'Failed to fetch trial status' });
+  }
+});
+
 // Get subscription plans
 router.get('/plans', async (req, res) => {
   try {
@@ -17,35 +32,41 @@ router.get('/plans', async (req, res) => {
 // Get seller's current subscription
 router.get('/current', verifyToken, async (req, res) => {
   try {
-    const [subscriptions] = await db.query(`
-      SELECT s.*, p.name as plan_name, p.max_listings, p.duration_months, p.price
+    // Get the most recent subscription, whether active or expired
+    const [subscription] = await db.query(`
+      SELECT s.*, p.name as plan_name, p.max_listings, p.duration_months, p.price,
+             CASE 
+               WHEN s.is_trial = true THEN 'Free Trial'
+               ELSE p.name
+             END as display_name,
+             CASE 
+               WHEN s.is_trial = true THEN 1
+               ELSE p.max_listings
+             END as effective_max_listings,
+             CASE
+               WHEN s.status = 'pending' THEN 'pending'
+               WHEN s.status = 'expired' OR 
+                    (s.is_trial = true AND s.trial_ends_at <= CURRENT_TIMESTAMP) OR
+                    (s.is_trial = false AND s.end_date <= CURRENT_TIMESTAMP) THEN 'expired'
+               ELSE 'active'
+             END as current_status
       FROM seller_subscriptions s
-      JOIN subscription_plans p ON s.plan_id = p.id
-      WHERE s.seller_id = ? AND s.status = 'active'
-      AND (s.end_date IS NULL OR s.end_date > CURRENT_TIMESTAMP)
+      LEFT JOIN subscription_plans p ON s.plan_id = p.id
+      WHERE s.seller_id = ?
       ORDER BY s.created_at DESC
       LIMIT 1
     `, [req.user.id]);
 
-    // Check if seller is in trial period
-    const [trialSubscription] = await db.query(`
-      SELECT * FROM seller_subscriptions
-      WHERE seller_id = ? AND is_trial = true
-      AND trial_ends_at > CURRENT_TIMESTAMP
-      LIMIT 1
-    `, [req.user.id]);
-
-    if (trialSubscription.length > 0) {
+    if (subscription.length > 0) {
+      const sub = subscription[0];
       res.json({
-        ...trialSubscription[0],
-        plan_name: 'Free Trial',
-        max_listings: 1,
-        duration_months: 0,
-        price: 0,
-        is_trial: true
+        ...sub,
+        plan_name: sub.display_name,
+        max_listings: sub.effective_max_listings,
+        duration_months: sub.is_trial ? 0 : sub.duration_months,
+        price: sub.is_trial ? 0 : sub.price,
+        status: sub.current_status // Use the calculated status
       });
-    } else if (subscriptions.length > 0) {
-      res.json(subscriptions[0]);
     } else {
       res.json(null);
     }
@@ -58,28 +79,37 @@ router.get('/current', verifyToken, async (req, res) => {
 // Start free trial
 router.post('/start-trial', verifyToken, async (req, res) => {
   try {
-    // Check if user already had a trial
-    const [existingTrial] = await db.query(
-      'SELECT * FROM seller_subscriptions WHERE seller_id = ? AND is_trial = true',
-      [req.user.id]
-    );
+    // Start transaction
+    await db.query('START TRANSACTION');
 
-    if (existingTrial.length > 0) {
-      return res.status(400).json({ message: 'Free trial already used' });
+    try {
+      // Check if user already had a trial
+      const [existingTrial] = await db.query(
+        'SELECT * FROM seller_subscriptions WHERE seller_id = ? AND is_trial_used = true',
+        [req.user.id]
+      );
+
+      if (existingTrial.length > 0) {
+        return res.status(400).json({ message: 'Free trial already used' });
+      }
+
+      // Create trial subscription
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 7); // 7 days trial
+
+      await db.query(`
+        INSERT INTO seller_subscriptions 
+        (seller_id, plan_id, status, is_trial, is_trial_used, trial_ends_at, end_date, created_at, updated_at) 
+        VALUES (?, 1, 'active', true, true, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [req.user.id, trialEndDate, trialEndDate]
+      );
+
+      await db.query('COMMIT');
+      res.json({ message: 'Free trial started successfully' });
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
     }
-
-    // Create trial subscription
-    const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + 7); // 7 days trial
-
-    await db.query(`
-      INSERT INTO seller_subscriptions 
-      (seller_id, plan_id, status, is_trial, trial_ends_at, end_date) 
-      VALUES (?, 1, 'active', true, ?, ?)`,
-      [req.user.id, trialEndDate, trialEndDate]
-    );
-
-    res.json({ message: 'Free trial started successfully' });
   } catch (error) {
     console.error('Error starting free trial:', error);
     res.status(500).json({ message: 'Failed to start free trial' });
@@ -95,42 +125,121 @@ router.post('/request', verifyToken, async (req, res) => {
   }
 
   try {
-    // Check if plan exists
-    const [plans] = await db.query(
-      'SELECT * FROM subscription_plans WHERE id = ?',
-      [planId]
-    );
+    // Start transaction
+    await db.query('START TRANSACTION');
 
-    if (plans.length === 0) {
-      return res.status(404).json({ message: 'Subscription plan not found' });
-    }
+    try {
+      // Check if plan exists
+      const [plans] = await db.query(
+        'SELECT * FROM subscription_plans WHERE id = ?',
+        [planId]
+      );
 
-    // Create subscription request
-    await db.query(`
-      INSERT INTO seller_subscriptions 
-      (seller_id, plan_id, status) 
-      VALUES (?, ?, 'pending')`,
-      [req.user.id, planId]
-    );
-
-    // Get plan details and bank details for the response
-    const plan = plans[0];
-    const [bankDetails] = await db.query('SELECT * FROM bank_details ORDER BY id DESC LIMIT 1');
-    
-    if (bankDetails.length === 0) {
-      return res.status(500).json({ message: 'Bank details not configured' });
-    }
-
-    res.json({ 
-      message: 'Subscription request submitted successfully',
-      paymentDetails: {
-        amount: plan.price,
-        bankName: bankDetails[0].bank_name,
-        accountNumber: bankDetails[0].account_number,
-        beneficiary: bankDetails[0].beneficiary,
-        instructions: `Please send the payment receipt to our WhatsApp number: ${bankDetails[0].whatsapp_number}`
+      if (plans.length === 0) {
+        throw new Error('Subscription plan not found');
       }
-    });
+
+      const plan = plans[0];
+
+      // Get current active subscription
+      const [currentSub] = await db.query(
+        `SELECT * FROM seller_subscriptions 
+         WHERE seller_id = ? AND status = 'active'`,
+        [req.user.id]
+      );
+
+      const now = new Date();
+      
+      // Calculate end date based on plan duration
+      const endDate = plan.duration_months > 0 
+        ? new Date(now.getTime() + (plan.duration_months * 30 * 24 * 60 * 60 * 1000))
+        : null;
+
+      // Create new subscription in pending status
+      const [result] = await db.query(
+        `INSERT INTO seller_subscriptions 
+         (seller_id, plan_id, status, start_date, end_date, created_at, updated_at, is_trial, is_trial_used)
+         VALUES (?, ?, 'pending', ?, ?, ?, ?, false, false)`,
+        [req.user.id, planId, now, endDate, now, now]
+      );
+
+      // After admin approves, they will expire the trial and activate this subscription
+
+      // Get bank details for payment
+      const [bankDetails] = await db.query('SELECT * FROM bank_details ORDER BY id DESC LIMIT 1');
+      
+      if (bankDetails.length === 0) {
+        throw new Error('Bank details not configured');
+      }
+
+      // Get the new subscription details with all fields
+      const [subscriptions] = await db.query(`
+        SELECT s.*, p.name as plan_name, p.max_listings, p.duration_months, p.price,
+               CASE 
+                 WHEN s.is_trial = true THEN 'Free Trial'
+                 ELSE p.name
+               END as display_name,
+               CASE 
+                 WHEN s.is_trial = true THEN 1
+                 ELSE p.max_listings
+               END as effective_max_listings
+        FROM seller_subscriptions s
+        JOIN subscription_plans p ON s.plan_id = p.id
+        WHERE s.id = ?
+        LIMIT 1
+      `, [result.insertId]);
+
+      // Format subscription data like /current endpoint
+      const subscription = subscriptions[0] ? {
+        ...subscriptions[0],
+        plan_name: subscriptions[0].display_name,
+        max_listings: subscriptions[0].effective_max_listings,
+        status: 'pending'  // Force pending status for new subscription
+      } : null;
+
+      // Commit transaction
+      await db.query('COMMIT');
+
+      // Get user's email
+      const [user] = await db.query('SELECT email FROM users WHERE id = ?', [req.user.id]);
+
+      // Send email notification about subscription request
+      const { sendSubscriptionEmail } = require('../utils/emailService');
+      await sendSubscriptionEmail(user[0].email, {
+        type: 'requested',
+        planName: plan.name,
+        price: plan.price,
+        duration: plan.duration_months === 1 ? '1 month' : `${plan.duration_months} months`,
+        maxListings: plan.max_listings
+      });
+
+
+      // Emit socket event to notify admin about new subscription request
+      const io = require('../utils/socketService').getIO();
+      io.to('admin_room').emit('subscription_request', {
+        type: 'pending',
+        subscription: {
+          id: result.insertId,
+          plan: plan
+        }
+      });
+
+      res.json({ 
+        message: 'Subscription request submitted successfully. Please wait for admin approval.',
+        subscription: subscription,
+        paymentDetails: {
+          amount: plan.price,
+          bankName: bankDetails[0].bank_name,
+          accountNumber: bankDetails[0].account_number,
+          beneficiary: bankDetails[0].beneficiary,
+          instructions: `Please send the payment receipt to our WhatsApp number: ${bankDetails[0].whatsapp_number}`
+        }
+      });
+    } catch (error) {
+      // Rollback on error
+      await db.query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error('Error requesting subscription:', error);
     res.status(500).json({ message: 'Failed to request subscription' });
@@ -162,15 +271,88 @@ router.post('/:subscriptionId/approve', verifyToken, async (req, res) => {
       ? new Date(Date.now() + subscription.duration_months * 30 * 24 * 60 * 60 * 1000)
       : null;
 
-    // Update subscription status
-    await db.query(`
-      UPDATE seller_subscriptions 
-      SET status = 'active', end_date = ?
-      WHERE id = ?`,
-      [endDate, req.params.subscriptionId]
-    );
+    await db.query('START TRANSACTION');
 
-    res.json({ message: 'Subscription approved successfully' });
+    try {
+      // Get the seller's current active subscription (if any)
+      const [currentSub] = await db.query(
+        `SELECT * FROM seller_subscriptions 
+         WHERE seller_id = ? AND status = 'active'`,
+        [subscription.seller_id]
+      );
+
+      const now = new Date();
+
+      // If there's an active subscription, expire it
+      if (currentSub.length > 0) {
+        await db.query(
+          `UPDATE seller_subscriptions 
+           SET status = 'expired',
+               end_date = ?,
+               updated_at = ?,
+               is_trial_used = CASE 
+                 WHEN is_trial = true OR status = 'expired' THEN 1 
+                 ELSE is_trial_used 
+               END
+           WHERE id = ?`,
+          [now, now, currentSub[0].id]
+        );
+      }
+
+      // Activate the pending subscription
+      await db.query(`
+        UPDATE seller_subscriptions 
+        SET status = 'active',
+            start_date = CURRENT_TIMESTAMP,
+            end_date = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?`,
+        [endDate, req.params.subscriptionId]
+      );
+
+      // Get seller's email
+      const [seller] = await db.query(
+        'SELECT email FROM users WHERE id = ?',
+        [subscription.seller_id]
+      );
+
+      // Emit socket event to notify seller
+      const io = require('../utils/socketService').getIO();
+      io.to(`seller_${subscription.seller_id}`).emit('subscription_update', {
+        type: 'approved',
+        subscription: {
+          ...subscription,
+          status: 'active',
+          end_date: endDate
+        }
+      });
+
+      // Get full subscription details
+      const [subDetails] = await db.query(`
+        SELECT s.*, p.name as plan_name, p.price, p.max_listings, p.duration_months
+        FROM seller_subscriptions s
+        JOIN subscription_plans p ON s.plan_id = p.id
+        WHERE s.id = ?`,
+        [req.params.subscriptionId]
+      );
+
+      // Send email notification
+      const { sendSubscriptionEmail } = require('../utils/emailService');
+      await sendSubscriptionEmail(seller[0].email, {
+        type: 'approved',
+        planName: subDetails[0].plan_name,
+        price: subDetails[0].price,
+        duration: subDetails[0].duration_months === 1 ? '1 month' : `${subDetails[0].duration_months} months`,
+        maxListings: subDetails[0].max_listings,
+        endDate: endDate
+      });
+
+      await db.query('COMMIT');
+      res.json({ message: 'Subscription approved successfully' });
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error('Error approving subscription:', error);
     res.status(500).json({ message: 'Failed to approve subscription' });

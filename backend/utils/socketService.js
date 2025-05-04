@@ -27,6 +27,9 @@ const updateUserStatus = (userId, isOnline) => {
 const initializeSocket = (socketIo) => {
   io = socketIo;
 
+  // Start checking for subscription events
+  checkSubscriptionEvents();
+
   // Authentication middleware
   io.use((socket, next) => {
     try {
@@ -54,6 +57,43 @@ const initializeSocket = (socketIo) => {
   io.on('connection', handleConnection);
 };
 
+// Check for subscription events every second
+const checkSubscriptionEvents = async () => {
+  setInterval(async () => {
+    try {
+      // Get unprocessed events
+      const [events] = await db.query(`
+        SELECT se.*, s.*, p.name as plan_name
+        FROM subscription_events se
+        JOIN seller_subscriptions s ON se.subscription_id = s.id
+        JOIN subscription_plans p ON s.plan_id = p.id
+        WHERE se.processed = FALSE
+        ORDER BY se.created_at ASC
+      `);
+
+      for (const event of events) {
+        // Emit event to seller's room
+        io.to(`seller_${event.seller_id}`).emit('subscription_update', {
+          type: event.event_type,
+          subscription: {
+            id: event.subscription_id,
+            status: 'expired',
+            plan_name: event.plan_name,
+            end_date: event.end_date,
+            trial_ends_at: event.trial_ends_at,
+            is_trial: event.is_trial
+          }
+        });
+
+        // Mark event as processed
+        await db.query('UPDATE subscription_events SET processed = TRUE WHERE id = ?', [event.id]);
+      }
+    } catch (error) {
+      console.error('Error checking subscription events:', error);
+    }
+  }, 1000);
+};
+
 const handleConnection = async (socket) => {
   const userId = socket.user.id;
 
@@ -68,6 +108,11 @@ const handleConnection = async (socket) => {
   // Join admin room if admin
   if (socket.user.role === 'admin') {
     socket.join('admin_room');
+  }
+
+  // Join seller room if seller
+  if (socket.user.role === 'seller') {
+    socket.join('seller_room');
   }
 
   // Handle marking messages as read
