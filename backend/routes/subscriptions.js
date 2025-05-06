@@ -44,6 +44,7 @@ router.get('/current', verifyToken, async (req, res) => {
                ELSE p.max_listings
              END as effective_max_listings,
              CASE
+               WHEN s.status = 'rejected' THEN 'rejected'
                WHEN s.status = 'pending' THEN 'pending'
                WHEN s.status = 'expired' OR 
                     (s.is_trial = true AND s.trial_ends_at <= CURRENT_TIMESTAMP) OR
@@ -83,6 +84,20 @@ router.post('/start-trial', verifyToken, async (req, res) => {
     await db.query('START TRANSACTION');
 
     try {
+      // Check for rejected subscription
+      const [rejectedSub] = await db.query(
+        `SELECT * FROM seller_subscriptions 
+         WHERE seller_id = ? AND status = 'rejected'
+         ORDER BY created_at DESC LIMIT 1`,
+        [req.user.id]
+      );
+
+      if (rejectedSub.length > 0) {
+        return res.status(403).json({ 
+          message: 'Your previous subscription request was rejected. Please contact support for assistance.'
+        });
+      }
+
       // Check if user already had a trial
       const [existingTrial] = await db.query(
         'SELECT * FROM seller_subscriptions WHERE seller_id = ? AND is_trial_used = true',
@@ -129,7 +144,7 @@ router.post('/request', verifyToken, async (req, res) => {
     await db.query('START TRANSACTION');
 
     try {
-      // Check if plan exists
+      // Get plan details and current subscription
       const [plans] = await db.query(
         'SELECT * FROM subscription_plans WHERE id = ?',
         [planId]
@@ -141,12 +156,52 @@ router.post('/request', verifyToken, async (req, res) => {
 
       const plan = plans[0];
 
-      // Get current active subscription
+      // Get current subscription with plan details
       const [currentSub] = await db.query(
-        `SELECT * FROM seller_subscriptions 
-         WHERE seller_id = ? AND status = 'active'`,
+        `SELECT s.*, p.max_listings as current_max_listings, p.name as current_plan_name
+         FROM seller_subscriptions s
+         JOIN subscription_plans p ON s.plan_id = p.id
+         WHERE s.seller_id = ? AND s.status = 'active'`,
         [req.user.id]
       );
+
+      // Get count of seller's active motors
+      const [motorCount] = await db.query(
+        `SELECT COUNT(*) as count 
+         FROM motors 
+         WHERE sellerId = ? 
+         AND status != 'deleted'`,
+        [req.user.id]
+      );
+
+      // Check if this is a downgrade (moving to a plan with fewer listings)
+      const isDowngrade = currentSub.length > 0 && 
+        (currentSub[0].current_max_listings === null || // Current plan is unlimited
+         (plan.max_listings !== null && plan.max_listings < currentSub[0].current_max_listings));
+
+      // If downgrading and have more motors than new plan allows, reject
+      if (isDowngrade && plan.max_listings !== null && motorCount[0].count > plan.max_listings) {
+        const excessMotors = motorCount[0].count - plan.max_listings;
+        return res.status(400).json({
+          message: `Cannot downgrade from ${currentSub[0].current_plan_name} to ${plan.name}: ` +
+                  `You currently have ${motorCount[0].count} motors. ` +
+                  `Please remove ${excessMotors} motor${excessMotors > 1 ? 's' : ''} before downgrading to a plan that only allows ${plan.max_listings} motors.`
+        });
+      }
+
+      // Check for rejected subscription
+      const [rejectedSub] = await db.query(
+        `SELECT * FROM seller_subscriptions 
+         WHERE seller_id = ? AND status = 'rejected'
+         ORDER BY created_at DESC LIMIT 1`,
+        [req.user.id]
+      );
+
+      if (rejectedSub.length > 0) {
+        return res.status(403).json({ 
+          message: 'Your previous subscription request was rejected. Please contact support for assistance.'
+        });
+      }
 
       const now = new Date();
       

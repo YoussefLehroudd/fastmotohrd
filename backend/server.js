@@ -746,14 +746,21 @@ const { initializeSocket } = require('./utils/socketService');
 // Check for expired subscriptions every minute
 setInterval(async () => {
   try {
-    // Update expired subscriptions
+    // Update expired subscriptions that don't have a newer active subscription
     await db.query(`
-      UPDATE seller_subscriptions
+      UPDATE seller_subscriptions s1
       SET status = 'expired'
       WHERE (
         (status = 'active' AND end_date IS NOT NULL AND end_date <= CURRENT_TIMESTAMP)
         OR
         (status = 'active' AND is_trial = true AND trial_ends_at <= CURRENT_TIMESTAMP)
+      )
+      AND NOT EXISTS (
+        SELECT 1 
+        FROM seller_subscriptions s2 
+        WHERE s2.seller_id = s1.seller_id 
+        AND s2.id > s1.id 
+        AND s2.status = 'active'
       )
     `);
 
@@ -770,6 +777,13 @@ setInterval(async () => {
         AND n.type = 'subscription_expired'
         AND JSON_EXTRACT(n.content, '$.subscription_id') = s.id
       )
+      AND NOT EXISTS (
+        SELECT 1 
+        FROM seller_subscriptions s2 
+        WHERE s2.seller_id = s.seller_id 
+        AND s2.id > s.id 
+        AND s2.status = 'active'
+      )
     `);
 
     // Insert notifications for newly expired subscriptions
@@ -779,11 +793,7 @@ setInterval(async () => {
         VALUES (?, 'subscription_expired', ?, CURRENT_TIMESTAMP)
       `, [
         sub.seller_id,
-        JSON.stringify({
-          subscription_id: sub.id,
-          plan_name: sub.plan_name,
-          expired_at: sub.is_trial ? sub.trial_ends_at : sub.end_date
-        })
+        `Your ${sub.plan_name} subscription has expired. Please renew to continue using all features.`
       ]);
 
       // Send email notification

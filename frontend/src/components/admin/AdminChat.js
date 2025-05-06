@@ -559,6 +559,7 @@ const AdminChat = () => {
                     size="small"
                     placeholder="Type a message..."
                     value={message}
+                    autoComplete="off"
                     onChange={handleTyping}
                   />
                   <IconButton type="submit" color="primary">

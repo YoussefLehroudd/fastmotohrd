@@ -20,6 +20,7 @@ const BankDetailsManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     fetchBankDetails();
@@ -74,6 +75,12 @@ const BankDetailsManagement = () => {
       
       const data = await response.json();
       setSuccess(data.message);
+      setIsEditing(false); // Disable editing mode
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
     } catch (error) {
       console.error('Error:', error);
       setError(error.message);
@@ -115,6 +122,29 @@ const BankDetailsManagement = () => {
 
       <Card>
         <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            {!isEditing ? (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit Details
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => {
+                  setIsEditing(false);
+                  fetchBankDetails(); // Reset to original values
+                }}
+                sx={{ mr: 1 }}
+              >
+                Cancel
+              </Button>
+            )}
+          </Box>
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
@@ -124,6 +154,7 @@ const BankDetailsManagement = () => {
               onChange={handleChange}
               margin="normal"
               required
+              disabled={!isEditing}
             />
             <TextField
               fullWidth
@@ -133,6 +164,7 @@ const BankDetailsManagement = () => {
               onChange={handleChange}
               margin="normal"
               required
+              disabled={!isEditing}
             />
             <TextField
               fullWidth
@@ -142,6 +174,7 @@ const BankDetailsManagement = () => {
               onChange={handleChange}
               margin="normal"
               required
+              disabled={!isEditing}
             />
             <TextField
               fullWidth
@@ -151,16 +184,19 @@ const BankDetailsManagement = () => {
               onChange={handleChange}
               margin="normal"
               required
+              disabled={!isEditing}
               helperText="Include country code (e.g., +212600000000)"
             />
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              sx={{ mt: 2 }}
-            >
-              Update Bank Details
-            </Button>
+            {isEditing && (
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                sx={{ mt: 2 }}
+              >
+                Save Changes
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>

@@ -55,7 +55,16 @@ const SellerSubscription = () => {
 
       // Update state with fresh data
       setPlans(plansData);
-      setCurrentSubscription(subscriptionData);
+      
+      // Preserve rejected status when fetching new data
+      if (currentSubscription?.status === 'rejected' && subscriptionData?.id === currentSubscription?.id) {
+        setCurrentSubscription({
+          ...subscriptionData,
+          status: 'rejected'
+        });
+      } else {
+        setCurrentSubscription(subscriptionData);
+      }
       
       // Clear any previous errors
       setError(null);
@@ -67,16 +76,18 @@ const SellerSubscription = () => {
     }
   }, []);
 
+  const [hasExpired, setHasExpired] = useState(false);
+
   useEffect(() => {
     let socket;
     let retryCount = 0;
     const maxRetries = 3;
     let checkInterval;
+    let isFetching = false;
 
     const checkSubscriptionStatus = async () => {
       const now = new Date();
-      if (currentSubscription) {
-        let isExpired = false;
+      if (currentSubscription && !hasExpired) {
         let endDate;
         
         if (currentSubscription.is_trial && currentSubscription.trial_ends_at) {
@@ -85,15 +96,27 @@ const SellerSubscription = () => {
           endDate = new Date(currentSubscription.end_date);
         }
 
-        if (endDate && now >= endDate) {
+        if (endDate && now >= endDate && currentSubscription.status !== 'expired') {
           // Update subscription status locally first
           setCurrentSubscription(prev => ({
             ...prev,
             status: 'expired'
           }));
+
+          // Mark as expired to prevent further checks
+          setHasExpired(true);
+
+          // Clear the interval to prevent repeated updates
+          if (checkInterval) {
+            clearInterval(checkInterval);
+          }
           
-          // Then fetch fresh data from server
-          await fetchSubscriptionData();
+          // Then fetch fresh data from server if not already fetching
+          if (!isFetching) {
+            isFetching = true;
+            await fetchSubscriptionData();
+            isFetching = false;
+          }
         }
       }
     };
@@ -121,30 +144,68 @@ const SellerSubscription = () => {
       });
 
       socket.on('subscription_update', (data) => {
-        console.log('Subscription updated:', data);
+        if (!data.subscription) return;
         
-        // Update subscription status immediately
-        if (data.type === 'expired' && data.subscription) {
-          setCurrentSubscription(prev => ({
-            ...prev,
-            ...data.subscription,
-            status: 'expired'
-          }));
-          
-          setSuccess({
-            show: true,
-            message: 'Your subscription has expired. Please renew to continue using all features.'
-          });
-        } else if (data.type === 'approved') {
-          setCurrentSubscription(prev => ({
-            ...prev,
-            status: 'active'
-          }));
-          
-          setSuccess({
-            show: true,
-            message: 'Your subscription has been approved!'
-          });
+        console.log('Subscription updated:', data);
+
+        // Skip update if this is an expired event for an old subscription
+        // when we already have a newer active subscription
+        if (data.type === 'expired' && currentSubscription && 
+            data.subscription.id < currentSubscription.id) {
+          return;
+        }
+
+        // Update subscription state
+        setCurrentSubscription(prev => {
+          // If this is a new active subscription, always use it
+          if (data.type === 'approved' || 
+              (data.subscription.status === 'active' && (!prev || data.subscription.id > prev.id))) {
+            return {
+              ...data.subscription,
+              status: 'active'
+            };
+          }
+
+          // For other updates, only apply if it's for the current subscription
+          if (prev && prev.id === data.subscription.id) {
+            return {
+              ...data.subscription,
+              status: data.type === 'rejected' ? 'rejected' : 
+                     data.type === 'cancelled' ? 'cancelled' :
+                     data.type === 'expired' ? 'expired' :
+                     data.subscription.status
+            };
+          }
+
+          return prev;
+        });
+
+        let message = '';
+        switch (data.type) {
+          case 'expired':
+            message = 'Your subscription has expired. Please renew to continue using all features.';
+            break;
+          case 'approved':
+            message = 'Your subscription has been approved!';
+            break;
+          case 'rejected':
+            message = 'Your subscription request has been rejected.';
+            break;
+          case 'cancelled':
+            message = 'Your subscription has been cancelled.';
+            break;
+          default:
+            message = 'Your subscription status has been updated.';
+        }
+        
+        setSuccess({
+          show: true,
+          message
+        });
+
+        // For 'expired' events, skip the delayed fetch if already expired to prevent loops
+        if (data.type !== 'expired' || (currentSubscription && currentSubscription.status !== 'expired')) {
+          setTimeout(fetchSubscriptionData, 1000);
         }
       });
     };
@@ -153,8 +214,8 @@ const SellerSubscription = () => {
     fetchSubscriptionData();
     connectSocket();
 
-    // Check subscription status every second
-    checkInterval = setInterval(checkSubscriptionStatus, 1000);
+    // Check subscription status every 30 seconds
+    checkInterval = setInterval(checkSubscriptionStatus, 30000);
 
     return () => {
       if (socket) {
@@ -168,6 +229,12 @@ const SellerSubscription = () => {
 
   const handleSubscribe = async (planId) => {
     try {
+      // Prevent subscribing if current subscription is rejected
+      if (currentSubscription?.status === 'rejected') {
+        setError('Your subscription request has been rejected. Please contact support for assistance.');
+        return;
+      }
+
       setLoading(true);
       const response = await fetch('http://localhost:5000/api/subscriptions/request', {
         method: 'POST',
@@ -257,8 +324,16 @@ const SellerSubscription = () => {
         
         {success.show && (
           <Alert 
-            severity="success" 
-            sx={{ mb: 3 }}
+            severity="success"
+            sx={{ 
+              mb: 3,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              '& .MuiAlert-message': {
+                textAlign: 'center'
+              }
+            }}
             onClose={() => setSuccess({ show: false, message: '' })}
           >
             {success.message}
@@ -302,6 +377,22 @@ const SellerSubscription = () => {
                   }
                 />
               </Box>
+              {currentSubscription.status === 'rejected' && (
+                <>
+                  <Alert severity="error" sx={{ mt: 1, mb: 2 }}>
+                    Your subscription request has been rejected. Please contact support for assistance.
+                  </Alert>
+                  <Box sx={{ mt: 2, textAlign: 'center' }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={() => document.querySelector('button[class*="MuiFab-root"]').click()}
+                    >
+                      OPEN LIVE CHAT
+                    </Button>
+                  </Box>
+                </>
+              )}
               {currentSubscription.status === 'active' && (
                 <Box sx={{ mt: 1, mb: 2 }}>
                   {(() => {
@@ -324,13 +415,26 @@ const SellerSubscription = () => {
                   })()}
                 </Box>
               )}
-              <Typography variant="body2" color="text.secondary">
-                Listings Used: {currentSubscription.listings_used} / {currentSubscription.max_listings || '∞'}
-              </Typography>
-              {currentSubscription.end_date && (
-                <Typography variant="body2" color="text.secondary">
-                  Expires: {new Date(currentSubscription.end_date).toLocaleDateString()}
-                </Typography>
+              {(currentSubscription.status === 'active' || currentSubscription.status === 'pending') && (
+                <>
+                  {currentSubscription.status === 'active' && (
+                    <>
+                      <Typography variant="body2" color="text.secondary">
+                        Listings Used: {currentSubscription.listings_used} / {currentSubscription.max_listings || '∞'}
+                      </Typography>
+                      {currentSubscription.end_date && (
+                        <Typography variant="body2" color="text.secondary">
+                          Expires: {new Date(currentSubscription.end_date).toLocaleDateString()}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                  {currentSubscription.status === 'pending' && (
+                    <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+                      Your subscription request is pending approval. Please wait for admin confirmation.
+                    </Alert>
+                  )}
+                </>
               )}
               {currentSubscription.is_trial === 1 && (
                 <Box sx={{ mt: 2 }}>
@@ -367,7 +471,7 @@ const SellerSubscription = () => {
                     variant="contained"
                     fullWidth
                     onClick={() => handleSubscribe(plan.id)}
-                    disabled={currentSubscription?.plan_id === plan.id}
+                    disabled={currentSubscription?.plan_id === plan.id || currentSubscription?.status === 'rejected'}
                     sx={{
                       backgroundColor: currentSubscription?.plan_id === plan.id ? 
                         currentSubscription.status === 'pending' ? '#ffa726' : '#e0e0e0' 
@@ -380,7 +484,8 @@ const SellerSubscription = () => {
                       }
                     }}
                   >
-                    {currentSubscription?.plan_id === plan.id ? 
+                    {currentSubscription?.status === 'rejected' ? 'OPEN LIVE CHAT' :
+                     currentSubscription?.plan_id === plan.id ? 
                       currentSubscription.status === 'pending' ? 'PENDING' : 'CURRENT PLAN' 
                       : 'SUBSCRIBE'}
                   </Button>

@@ -15,7 +15,8 @@ import {
   InputLabel,
   Select,
   Avatar,
-  Chip
+  Chip,
+  Typography
 } from '@mui/material';
 
 const statusColors = {
@@ -39,7 +40,6 @@ const MotorManagement = ({ motors, pagination, onPageChange, onSearch, onStatusF
     setPage(0);
     onPageChange(1, newRowsPerPage);
   };
-  
 
   const handlePageChange = (event, newPage) => {
     setPage(newPage);
@@ -118,44 +118,62 @@ const MotorManagement = ({ motors, pagination, onPageChange, onSearch, onStatusF
             </TableRow>
           </TableHead>
           <TableBody>
-            {motors.map((motor) => (
-              <TableRow key={motor.id}>
-                <TableCell>
-                  <Avatar
-                    src={motor.imageUrl}
-                    alt={motor.title}
-                    variant="rounded"
-                    sx={{ width: 60, height: 60 }}
-                  />
-                </TableCell>
-                <TableCell>{motor.title}</TableCell>
-                <TableCell>{`${motor.brand} ${motor.model} (${motor.year})`}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={motor.motorType}
-                    size="small"
-                    color="primary"
-                  />
-                </TableCell>
-                <TableCell>{motor.dailyRate} MAD/day</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={getStatusLabel(motor.isAvailableForRent)}
-                    color={statusColors[motor.isAvailableForRent]}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>{motor.sellerName}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={motor.city || 'N/A'}
-                    size="small"
-                    sx={{ mr: 0.5, mb: 0.5 }}
-                    title={motor.address || ''}
-                  />
+            {motors.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No Motorcycles Found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    No motorcycles have been added yet. They will appear here once sellers start listing their motorcycles.
+                  </Typography>
+                  {(statusFilter || typeFilter) && (
+                    <Typography variant="body2" color="text.secondary">
+                      Try removing the filters to see all motorcycles.
+                    </Typography>
+                  )}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              motors.map((motor) => (
+                <TableRow key={motor.id}>
+                  <TableCell>
+                    <Avatar
+                      src={motor.imageUrl}
+                      alt={motor.title}
+                      variant="rounded"
+                      sx={{ width: 60, height: 60 }}
+                    />
+                  </TableCell>
+                  <TableCell>{motor.title}</TableCell>
+                  <TableCell>{`${motor.brand} ${motor.model} (${motor.year})`}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={motor.motorType}
+                      size="small"
+                      color="primary"
+                    />
+                  </TableCell>
+                  <TableCell>{motor.dailyRate} MAD/day</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={getStatusLabel(motor.isAvailableForRent)}
+                      color={statusColors[motor.isAvailableForRent]}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>{motor.sellerName}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={motor.city || 'N/A'}
+                      size="small"
+                      sx={{ mr: 0.5, mb: 0.5 }}
+                      title={motor.address || ''}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

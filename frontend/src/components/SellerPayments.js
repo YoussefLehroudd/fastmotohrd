@@ -137,7 +137,21 @@ const SellerPayments = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {payments.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((payment) => (
+            {payments.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      No Payments Found
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      You haven't received any payments yet. Payments will appear here once you start receiving bookings.
+                    </Typography>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ) : (
+              payments.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((payment) => (
               <TableRow key={payment.id}>
                 <TableCell>
                   {new Date(payment.created_at).toLocaleDateString()}
@@ -172,7 +186,8 @@ const SellerPayments = () => {
                   </Box>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
           </Table>
         </TableContainer>

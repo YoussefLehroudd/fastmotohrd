@@ -7,6 +7,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Paper,
   Button,
   Chip,
@@ -16,20 +17,51 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  DialogContentText
+  DialogContentText,
+  TextField,
+  InputAdornment
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 
 const SubscriptionManagement = () => {
   const [subscriptions, setSubscriptions] = useState([]);
+  const [filteredSubscriptions, setFilteredSubscriptions] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     subscriptionId: null,
     subscriptionDetails: null
   });
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setPage(0); // Reset to first page when searching
+    if (!query) {
+      setFilteredSubscriptions(subscriptions);
+      return;
+    }
+    const lowercaseQuery = query.toLowerCase();
+    const filtered = subscriptions.filter(subscription => 
+      subscription.seller_name.toLowerCase().includes(lowercaseQuery) ||
+      subscription.seller_email?.toLowerCase().includes(lowercaseQuery)
+    );
+    setFilteredSubscriptions(filtered);
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const fetchSubscriptions = async () => {
     try {
@@ -43,6 +75,7 @@ const SubscriptionManagement = () => {
 
       const data = await response.json();
       setSubscriptions(data);
+      setFilteredSubscriptions(data);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
     } finally {
@@ -133,10 +166,28 @@ const SubscriptionManagement = () => {
   }
 
   return (
-    <Box sx={{ width: '100%', p: 3 }}>
-      <Typography variant="h5" sx={{ mb: 3 }}>Subscription Management</Typography>
-      <TableContainer component={Paper}>
-        <Table>
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, maxWidth: '100%' }}>
+        <Typography variant="h5">Subscription Management</Typography>
+        <TextField
+          placeholder="Search by name or email"
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={(e) => handleSearch(e.target.value)}
+          autoComplete="off"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ width: 300 }}
+        />
+      </Box>
+      <TableContainer component={Paper} sx={{ maxWidth: '100%' }}>
+        <Table size="small">
           <TableHead>
             <TableRow>
               <TableCell>Seller</TableCell>
@@ -150,14 +201,23 @@ const SubscriptionManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {subscriptions.length === 0 ? (
+            {filteredSubscriptions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
-                  No subscription requests found
+                <TableCell colSpan={8} align="center" sx={{ py: 3 }}>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No Subscriptions Found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {searchQuery ? 
+                      "No subscriptions match your search criteria. Try a different search term." :
+                      "No subscription requests have been made yet."}
+                  </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              subscriptions.map((subscription) => (
+              filteredSubscriptions
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((subscription) => (
                 <TableRow key={subscription.id}>
                   <TableCell>{subscription.seller_name}</TableCell>
                   <TableCell>{subscription.display_plan_name}</TableCell>
@@ -224,6 +284,15 @@ const SubscriptionManagement = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      <TablePagination
+        component="div"
+        count={filteredSubscriptions.length}
+        page={page}
+        onPageChange={handleChangePage}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleChangeRowsPerPage}
+        rowsPerPageOptions={[5, 10, 25]}
+      />
       <Dialog
         open={deleteDialog.open}
         onClose={handleDeleteClose}

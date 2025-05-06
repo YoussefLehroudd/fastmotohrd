@@ -24,7 +24,8 @@ import {
   Payment as PaymentIcon,
   Star as ReviewsIcon,
   DirectionsBike as MotorsIcon,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  Subscriptions as SubscriptionIcon
 } from '@mui/icons-material';
 import NotificationsMenu from './NotificationsMenu';
 import { useNavigate } from 'react-router-dom';
@@ -65,7 +66,8 @@ const SellerNavbar = ({ selectedTab, onTabChange }) => {
     { icon: <OrdersIcon />, title: 'Orders', index: 1 },
     { icon: <PaymentIcon />, title: 'Payments', index: 2 },
     { icon: <ReviewsIcon />, title: 'Reviews', index: 3 },
-    { icon: <MotorsIcon />, title: 'My Motors', index: 4 }
+    { icon: <MotorsIcon />, title: 'My Motors', index: 4 },
+    { icon: <SubscriptionIcon />, title: 'Subscription', index: 6 }
   ];
 
   const drawer = (
@@ -244,6 +246,21 @@ const SellerNavbar = ({ selectedTab, onTabChange }) => {
               }}
             >
               <MotorsIcon />
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Subscription">
+            <IconButton 
+              color="inherit"
+              onClick={() => handleNavigation(6)}
+              sx={{ 
+                '&:hover': { backgroundColor: 'rgba(255, 255, 255, 0.1)' },
+                ...(selectedTab === 6 && {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                })
+              }}
+            >
+              <SubscriptionIcon />
             </IconButton>
           </Tooltip>
         </Box>

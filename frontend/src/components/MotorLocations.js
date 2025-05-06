@@ -249,12 +249,14 @@ const MotorLocations = ({ motorId }) => {
             </ListItem>
           ))}
           {locations.length === 0 && (
-            <ListItem>
-              <ListItemText 
-                primary="No locations added yet"
-                sx={{ color: 'text.secondary', fontStyle: 'italic' }}
-              />
-            </ListItem>
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No Locations Added Yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Add locations where this motorcycle is available for rent. Click the "Add Location" button above to get started.
+              </Typography>
+            </Box>
           )}
         </List>
       </Paper>

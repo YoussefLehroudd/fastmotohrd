@@ -61,9 +61,16 @@ const initializeSocket = (socketIo) => {
 const checkSubscriptionEvents = async () => {
   setInterval(async () => {
     try {
-      // Get unprocessed events
+      // Get unprocessed events and check for newer active subscriptions
       const [events] = await db.query(`
-        SELECT se.*, s.*, p.name as plan_name
+        SELECT se.*, s.*, p.name as plan_name,
+          EXISTS (
+            SELECT 1 
+            FROM seller_subscriptions s2 
+            WHERE s2.seller_id = s.seller_id 
+            AND s2.id > s.id 
+            AND s2.status = 'active'
+          ) as has_newer_active
         FROM subscription_events se
         JOIN seller_subscriptions s ON se.subscription_id = s.id
         JOIN subscription_plans p ON s.plan_id = p.id
@@ -72,18 +79,36 @@ const checkSubscriptionEvents = async () => {
       `);
 
       for (const event of events) {
-        // Emit event to seller's room
-        io.to(`seller_${event.seller_id}`).emit('subscription_update', {
-          type: event.event_type,
-          subscription: {
-            id: event.subscription_id,
-            status: 'expired',
-            plan_name: event.plan_name,
-            end_date: event.end_date,
-            trial_ends_at: event.trial_ends_at,
-            is_trial: event.is_trial
+        // Skip expired events if there's a newer active subscription
+        if (event.event_type === 'expired' && event.has_newer_active) {
+          await db.query('UPDATE subscription_events SET processed = TRUE WHERE id = ?', [event.id]);
+          continue;
+        }
+
+        // Get current subscription status
+        const [subscription] = await db.query(`
+          SELECT s.*, p.* 
+          FROM seller_subscriptions s
+          JOIN subscription_plans p ON s.plan_id = p.id
+          WHERE s.id = ?
+        `, [event.subscription_id]);
+
+        if (subscription.length > 0) {
+          // Only emit if the subscription status matches the event type
+          // This prevents emitting expired events for active subscriptions
+          const currentStatus = subscription[0].status;
+          if ((event.event_type === 'expired' && currentStatus === 'expired') ||
+              (event.event_type !== 'expired' && currentStatus !== 'expired')) {
+            io.to(`seller_${event.seller_id}`).emit('subscription_update', {
+              type: event.event_type,
+              subscription: {
+                ...subscription[0],
+                status: currentStatus,
+                plan_name: subscription[0].name
+              }
+            });
           }
-        });
+        }
 
         // Mark event as processed
         await db.query('UPDATE subscription_events SET processed = TRUE WHERE id = ?', [event.id]);
@@ -113,6 +138,7 @@ const handleConnection = async (socket) => {
   // Join seller room if seller
   if (socket.user.role === 'seller') {
     socket.join('seller_room');
+    socket.join(`seller_${socket.user.id}`); // Join seller-specific room
   }
 
   // Handle marking messages as read

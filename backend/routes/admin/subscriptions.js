@@ -11,6 +11,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
       SELECT 
         ss.*,
         u.username as seller_name,
+        u.email as seller_email,
         sp.name as plan_name,
         sp.price,
         sp.duration_months,
@@ -83,10 +84,36 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
     try {
       // Get current active subscription if exists
       const [currentSub] = await db.query(
-        `SELECT * FROM seller_subscriptions 
-         WHERE seller_id = ? AND status = 'active'`,
+        `SELECT s.*, p.max_listings as current_max_listings, p.name as current_plan_name
+         FROM seller_subscriptions s
+         JOIN subscription_plans p ON s.plan_id = p.id
+         WHERE s.seller_id = ? AND s.status = 'active'`,
         [subscription[0].seller_id]
       );
+
+      // Get count of seller's active motors
+      const [motorCount] = await db.query(
+        `SELECT COUNT(*) as count 
+         FROM motors 
+         WHERE sellerId = ? 
+         AND status != 'deleted'`,
+        [subscription[0].seller_id]
+      );
+
+      // Check if this is a downgrade (moving to a plan with fewer listings)
+      const isDowngrade = currentSub.length > 0 && 
+        (currentSub[0].current_max_listings === null || // Current plan is unlimited
+         (plan[0].max_listings !== null && plan[0].max_listings < currentSub[0].current_max_listings));
+
+      // If downgrading and have more motors than new plan allows, reject
+      if (isDowngrade && plan[0].max_listings !== null && motorCount[0].count > plan[0].max_listings) {
+        const excessMotors = motorCount[0].count - plan[0].max_listings;
+        throw new Error(
+          `Cannot downgrade from ${currentSub[0].current_plan_name} to ${plan[0].name}: ` +
+          `You currently have ${motorCount[0].count} motors. ` +
+          `Please remove ${excessMotors} motor${excessMotors > 1 ? 's' : ''} before downgrading to a plan that only allows ${plan[0].max_listings} motors.`
+        );
+      }
 
       const now = new Date();
 
@@ -103,16 +130,7 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
         );
       }
 
-      // Get count of seller's active motors
-      const [motorCount] = await db.query(
-        `SELECT COUNT(*) as count 
-         FROM motors 
-         WHERE sellerId = ? 
-         AND status != 'deleted'`,
-        [subscription[0].seller_id]
-      );
-
-      // Update new subscription status
+      // Update new subscription status and transfer the listings count
       await db.query(
         `UPDATE seller_subscriptions 
          SET status = 'active',
@@ -123,13 +141,8 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
              is_trial_used = false,
              listings_used = ?
          WHERE id = ?`,
-        [endDate, motorCount[0].count, id]
+        [endDate, currentSub.length > 0 ? currentSub[0].listings_used : motorCount[0].count, id]
       );
-
-      // Verify motor count doesn't exceed plan limit
-      if (plan[0].max_listings !== null && motorCount[0].count > plan[0].max_listings) {
-        throw new Error(`Cannot activate subscription: Seller has ${motorCount[0].count} motors but plan only allows ${plan[0].max_listings}`);
-      }
 
       // Get seller's email
       const [seller] = await db.query(
@@ -147,6 +160,14 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
         maxListings: plan[0].max_listings
       });
 
+      // Create notification for the seller
+      const notificationMessage = `Your ${plan[0].name} subscription has been approved. You can list up to ${plan[0].max_listings || 'unlimited'} motors.`;
+      await db.query(
+        `INSERT INTO notifications (userId, type, content, priority) 
+         VALUES (?, 'subscription_approved', ?, 'high')`,
+        [subscription[0].seller_id, notificationMessage]
+      );
+
       // Commit the transaction
       await db.query('COMMIT');
     } catch (error) {
@@ -155,16 +176,18 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
       throw error;
     }
 
-    // Get seller ID to emit socket event
-    const sellerId = subscription[0].seller_id;
-    
+    // Get updated subscription details
+    const [updatedSubscription] = await db.query(
+      'SELECT s.*, p.name as plan_name FROM seller_subscriptions s JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?',
+      [id]
+    );
+
     // Emit socket event to notify seller
     const io = getIO();
-    io.to('seller_room').emit('subscription_update', {
+    io.to(`seller_${subscription[0].seller_id}`).emit('subscription_update', {
       type: 'approved',
       subscription: {
-        ...subscription[0],
-        plan: plan[0],
+        ...updatedSubscription[0],
         end_date: endDate
       }
     });
@@ -182,15 +205,55 @@ router.post('/:id/reject', authenticateAdmin, async (req, res) => {
   const { reason } = req.body;
 
   try {
-    await db.query(
-      `UPDATE seller_subscriptions 
-       SET status = 'rejected',
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [id]
-    );
+    // Start transaction
+    await db.query('START TRANSACTION');
 
-    res.json({ message: 'Subscription rejected successfully' });
+    try {
+      // Get subscription details first
+      const [subscription] = await db.query(
+        'SELECT * FROM seller_subscriptions WHERE id = ?',
+        [id]
+      );
+
+      if (!subscription[0]) {
+        throw new Error('Subscription not found');
+      }
+
+      await db.query(
+        `UPDATE seller_subscriptions 
+         SET status = 'rejected',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [id]
+      );
+
+      // Create notification for the seller
+      await db.query(
+        `INSERT INTO notifications (userId, type, content, priority) 
+         VALUES (?, 'subscription_rejected', ?, 'high')`,
+        [subscription[0].seller_id, 'Your subscription request has been rejected.']
+      );
+
+      await db.query('COMMIT');
+
+      // Get updated subscription details
+      const [updatedSubscription] = await db.query(
+        'SELECT s.*, p.name as plan_name FROM seller_subscriptions s JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?',
+        [id]
+      );
+
+      // Emit socket event to notify seller
+      const io = getIO();
+      io.to(`seller_${subscription[0].seller_id}`).emit('subscription_update', {
+        type: 'rejected',
+        subscription: updatedSubscription[0]
+      });
+
+      res.json({ message: 'Subscription rejected successfully' });
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error('Error rejecting subscription:', error);
     res.status(500).json({ message: 'Error rejecting subscription', error: error.message });
@@ -203,15 +266,55 @@ router.post('/:id/cancel', authenticateAdmin, async (req, res) => {
   const { reason } = req.body;
 
   try {
-    await db.query(
-      `UPDATE seller_subscriptions 
-       SET status = 'cancelled',
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [id]
-    );
+    // Start transaction
+    await db.query('START TRANSACTION');
 
-    res.json({ message: 'Subscription cancelled successfully' });
+    try {
+      // Get subscription details first
+      const [subscription] = await db.query(
+        'SELECT * FROM seller_subscriptions WHERE id = ?',
+        [id]
+      );
+
+      if (!subscription[0]) {
+        throw new Error('Subscription not found');
+      }
+
+      await db.query(
+        `UPDATE seller_subscriptions 
+         SET status = 'cancelled',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [id]
+      );
+
+      // Create notification for the seller
+      await db.query(
+        `INSERT INTO notifications (userId, type, content, priority) 
+         VALUES (?, 'subscription_cancelled', ?, 'high')`,
+        [subscription[0].seller_id, 'Your subscription has been cancelled.']
+      );
+
+      await db.query('COMMIT');
+
+      // Get updated subscription details
+      const [updatedSubscription] = await db.query(
+        'SELECT s.*, p.name as plan_name FROM seller_subscriptions s JOIN subscription_plans p ON s.plan_id = p.id WHERE s.id = ?',
+        [id]
+      );
+
+      // Emit socket event to notify seller
+      const io = getIO();
+      io.to(`seller_${subscription[0].seller_id}`).emit('subscription_update', {
+        type: 'cancelled',
+        subscription: updatedSubscription[0]
+      });
+
+      res.json({ message: 'Subscription cancelled successfully' });
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
+    }
   } catch (error) {
     console.error('Error cancelling subscription:', error);
     res.status(500).json({ message: 'Error cancelling subscription', error: error.message });

@@ -182,9 +182,18 @@ const SellerDashboard = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {dashboardData.recentBookings
-                .slice(page * rowsPerPage, (page + 1) * rowsPerPage)
-                .map((booking) => (
+              {dashboardData.recentBookings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      No bookings found. Start adding motors to receive bookings!
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                dashboardData.recentBookings
+                  .slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+                  .map((booking) => (
                 <TableRow 
                   key={booking.id}
                   onClick={() => handleRowClick(booking)}
@@ -207,7 +216,8 @@ const SellerDashboard = () => {
                     />
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>

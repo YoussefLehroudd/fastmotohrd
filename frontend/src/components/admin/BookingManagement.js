@@ -124,52 +124,70 @@ const BookingManagement = ({ bookings, pagination, onPageChange, onSearch, onSta
             </TableRow>
           </TableHead>
           <TableBody>
-            {bookings.map((booking) => (
-              <TableRow key={booking.id}>
-                <TableCell>{booking.id}</TableCell>
-                <TableCell>{booking.motorTitle}</TableCell>
-                <TableCell>{booking.userName}</TableCell>
-                <TableCell>{booking.sellerName}</TableCell>
-                <TableCell>
-                  {`${new Date(booking.startDate).toLocaleDateString()} - ${new Date(booking.endDate).toLocaleDateString()}`}
-                </TableCell>
-                <TableCell>{booking.totalPrice} MAD</TableCell>
-                <TableCell>
-                  <Chip
-                    label={booking.status}
-                    color={statusColors[booking.status]}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={booking.paymentStatus || 'unpaid'}
-                    color={paymentStatusColors[booking.paymentStatus] || 'error'}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Tooltip title="View Details">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleViewDetails(booking)}
-                    >
-                      <InfoIcon />
-                    </IconButton>
-                  </Tooltip>
-                  {booking.status === 'pending' && (
-                    <Tooltip title="View Payment">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                      >
-                        <PaymentIcon />
-                      </IconButton>
-                    </Tooltip>
+            {bookings.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No Bookings Found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    No motorcycle bookings have been made yet. Bookings will appear here once customers start renting motorcycles.
+                  </Typography>
+                  {statusFilter && (
+                    <Typography variant="body2" color="text.secondary">
+                      Try removing the status filter to see all bookings.
+                    </Typography>
                   )}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              bookings.map((booking) => (
+                <TableRow key={booking.id}>
+                  <TableCell>{booking.id}</TableCell>
+                  <TableCell>{booking.motorTitle}</TableCell>
+                  <TableCell>{booking.userName}</TableCell>
+                  <TableCell>{booking.sellerName}</TableCell>
+                  <TableCell>
+                    {`${new Date(booking.startDate).toLocaleDateString()} - ${new Date(booking.endDate).toLocaleDateString()}`}
+                  </TableCell>
+                  <TableCell>{booking.totalPrice} MAD</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={booking.status}
+                      color={statusColors[booking.status]}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={booking.paymentStatus || 'unpaid'}
+                      color={paymentStatusColors[booking.paymentStatus] || 'error'}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="View Details">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleViewDetails(booking)}
+                      >
+                        <InfoIcon />
+                      </IconButton>
+                    </Tooltip>
+                    {booking.status === 'pending' && (
+                      <Tooltip title="View Payment">
+                        <IconButton
+                          size="small"
+                          color="primary"
+                        >
+                          <PaymentIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

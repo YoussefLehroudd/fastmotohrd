@@ -33,6 +33,14 @@ const checkSubscription = async (req, res, next) => {
 
     const subscription = subscriptions[0];
 
+    // Check if subscription is rejected
+    if (subscription.status === 'rejected') {
+      return res.status(403).json({ 
+        message: 'Your subscription request has been rejected. Please contact support for assistance.',
+        requiresSubscription: true
+      });
+    }
+
     // Check if subscription is expired
     if (subscription.current_status === 'expired') {
       return res.status(403).json({ 

@@ -25,7 +25,8 @@ import {
   Fab,
   MenuItem,
   Snackbar,
-  TablePagination
+  TablePagination,
+  Paper
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -328,8 +329,18 @@ const Seller = () => {
           {selectedTab === 4 && (
             <>
               <Box>
-                <Grid container spacing={3}>
-                  {motors.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((motor) => (
+                {motors.length === 0 ? (
+                  <Paper sx={{ p: 6, textAlign: 'center' }}>
+                    <Typography variant="h6" color="text.secondary" gutterBottom>
+                      No Motors Added Yet
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      You haven't added any motorcycles yet. Click the + button below to add your first motorcycle.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  <Grid container spacing={3}>
+                    {motors.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map((motor) => (
                   <Grid item xs={12} sm={6} md={4} key={motor.id}>
                     <Card>
                       {motor.imageUrl && (
@@ -448,8 +459,9 @@ const Seller = () => {
                       </CardActions>
                     </Card>
                   </Grid>
-                  ))}
-                </Grid>
+                    ))}
+                  </Grid>
+                )}
                 <TablePagination
                   rowsPerPageOptions={[5, 10, 25]}
                   component="div"

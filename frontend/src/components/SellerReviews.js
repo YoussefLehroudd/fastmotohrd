@@ -180,10 +180,20 @@ const SellerReviews = () => {
 
       {/* Reviews List */}
       <Stack spacing={2}>
-        {reviewsData.reviews
-          .slice(page * rowsPerPage, (page + 1) * rowsPerPage)
-          .map((review) => (
-          <Paper key={review.id} sx={{ p: 3 }}>
+        {reviewsData.reviews.length === 0 ? (
+          <Paper sx={{ p: 6, textAlign: 'center' }}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No Reviews Yet
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              You haven't received any reviews yet. Reviews will appear here once customers start rating their experience.
+            </Typography>
+          </Paper>
+        ) : (
+          reviewsData.reviews
+            .slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+            .map((review) => (
+              <Paper key={review.id} sx={{ p: 3 }}>
             <Grid container spacing={2}>
               <Grid item>
                 <Avatar sx={{ bgcolor: 'primary.main' }}>
@@ -308,8 +318,9 @@ const SellerReviews = () => {
                 </Box>
               </Grid>
             </Grid>
-          </Paper>
-        ))}
+              </Paper>
+            ))
+        )}
       </Stack>
       <Box sx={{ mt: 2 }}>
         <TablePagination

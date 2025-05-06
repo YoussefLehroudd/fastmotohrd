@@ -226,9 +226,23 @@ const SellerOrders = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {orders
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((order) => (
+              {orders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        No Orders Found
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        You haven't received any orders yet. Add motors to start receiving bookings!
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                orders
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>#{order.id}</TableCell>
                     <TableCell>{new Date(order.startDate).toLocaleDateString()}</TableCell>
@@ -263,7 +277,8 @@ const SellerOrders = () => {
                       {renderActions(order)}
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
