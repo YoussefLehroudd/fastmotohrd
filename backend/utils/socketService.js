@@ -58,44 +58,42 @@ const initializeSocket = (socketIo) => {
 };
 
 // Check for subscription events every second
+const processedEventIds = new Set(); 
+
 const checkSubscriptionEvents = async () => {
   setInterval(async () => {
     try {
-      // Get unprocessed events and check for newer active subscriptions
       const [events] = await db.query(`
-        SELECT se.*, s.*, p.name as plan_name,
-          EXISTS (
-            SELECT 1 
-            FROM seller_subscriptions s2 
-            WHERE s2.seller_id = s.seller_id 
-            AND s2.id > s.id 
-            AND s2.status = 'active'
-          ) as has_newer_active
+        SELECT se.*, 
+               EXISTS (
+                 SELECT 1 
+                 FROM seller_subscriptions s2 
+                 WHERE s2.seller_id = se.seller_id 
+                 AND s2.status = 'active'
+                 AND s2.created_at > se.created_at
+               ) as has_newer_active
         FROM subscription_events se
-        JOIN seller_subscriptions s ON se.subscription_id = s.id
-        JOIN subscription_plans p ON s.plan_id = p.id
         WHERE se.processed = FALSE
         ORDER BY se.created_at ASC
       `);
 
       for (const event of events) {
-        // Skip expired events if there's a newer active subscription
+        if (processedEventIds.has(event.id)) continue;
+        processedEventIds.add(event.id);
+
         if (event.event_type === 'expired' && event.has_newer_active) {
           await db.query('UPDATE subscription_events SET processed = TRUE WHERE id = ?', [event.id]);
           continue;
         }
 
-        // Get current subscription status
         const [subscription] = await db.query(`
-          SELECT s.*, p.* 
+          SELECT s.*, p.name, p.max_listings
           FROM seller_subscriptions s
           JOIN subscription_plans p ON s.plan_id = p.id
           WHERE s.id = ?
         `, [event.subscription_id]);
 
         if (subscription.length > 0) {
-          // Only emit if the subscription status matches the event type
-          // This prevents emitting expired events for active subscriptions
           const currentStatus = subscription[0].status;
           if ((event.event_type === 'expired' && currentStatus === 'expired') ||
               (event.event_type !== 'expired' && currentStatus !== 'expired')) {
@@ -110,7 +108,6 @@ const checkSubscriptionEvents = async () => {
           }
         }
 
-        // Mark event as processed
         await db.query('UPDATE subscription_events SET processed = TRUE WHERE id = ?', [event.id]);
       }
     } catch (error) {

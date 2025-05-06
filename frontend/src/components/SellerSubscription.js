@@ -87,7 +87,15 @@ const SellerSubscription = () => {
 
     const checkSubscriptionStatus = async () => {
       const now = new Date();
-      if (currentSubscription && !hasExpired) {
+      if (currentSubscription?.status === 'expired' || hasExpired) {
+        // Clear the interval if subscription is already expired
+        if (checkInterval) {
+          clearInterval(checkInterval);
+        }
+        return;
+      }
+
+      if (currentSubscription) {
         let endDate;
         
         if (currentSubscription.is_trial && currentSubscription.trial_ends_at) {
@@ -96,13 +104,7 @@ const SellerSubscription = () => {
           endDate = new Date(currentSubscription.end_date);
         }
 
-        if (endDate && now >= endDate && currentSubscription.status !== 'expired') {
-          // Update subscription status locally first
-          setCurrentSubscription(prev => ({
-            ...prev,
-            status: 'expired'
-          }));
-
+        if (endDate && now >= endDate) {
           // Mark as expired to prevent further checks
           setHasExpired(true);
 
@@ -143,70 +145,23 @@ const SellerSubscription = () => {
         }
       });
 
-      socket.on('subscription_update', (data) => {
+      socket.on('subscription_update', async (data) => {
         if (!data.subscription) return;
         
         console.log('Subscription updated:', data);
 
-        // Skip update if this is an expired event for an old subscription
-        // when we already have a newer active subscription
-        if (data.type === 'expired' && currentSubscription && 
-            data.subscription.id < currentSubscription.id) {
+        // Skip if subscription is already in the desired state
+        if (currentSubscription?.status === data.subscription.status) {
           return;
         }
 
-        // Update subscription state
-        setCurrentSubscription(prev => {
-          // If this is a new active subscription, always use it
-          if (data.type === 'approved' || 
-              (data.subscription.status === 'active' && (!prev || data.subscription.id > prev.id))) {
-            return {
-              ...data.subscription,
-              status: 'active'
-            };
-          }
-
-          // For other updates, only apply if it's for the current subscription
-          if (prev && prev.id === data.subscription.id) {
-            return {
-              ...data.subscription,
-              status: data.type === 'rejected' ? 'rejected' : 
-                     data.type === 'cancelled' ? 'cancelled' :
-                     data.type === 'expired' ? 'expired' :
-                     data.subscription.status
-            };
-          }
-
-          return prev;
-        });
-
-        let message = '';
-        switch (data.type) {
-          case 'expired':
-            message = 'Your subscription has expired. Please renew to continue using all features.';
-            break;
-          case 'approved':
-            message = 'Your subscription has been approved!';
-            break;
-          case 'rejected':
-            message = 'Your subscription request has been rejected.';
-            break;
-          case 'cancelled':
-            message = 'Your subscription has been cancelled.';
-            break;
-          default:
-            message = 'Your subscription status has been updated.';
+        // For expired subscriptions, only update if not already expired
+        if (data.type === 'expired' && currentSubscription?.status === 'expired') {
+          return;
         }
-        
-        setSuccess({
-          show: true,
-          message
-        });
 
-        // For 'expired' events, skip the delayed fetch if already expired to prevent loops
-        if (data.type !== 'expired' || (currentSubscription && currentSubscription.status !== 'expired')) {
-          setTimeout(fetchSubscriptionData, 1000);
-        }
+        // Update subscription data from server to ensure consistency
+        await fetchSubscriptionData();
       });
     };
 
@@ -471,17 +426,9 @@ const SellerSubscription = () => {
                     variant="contained"
                     fullWidth
                     onClick={() => handleSubscribe(plan.id)}
-                    disabled={currentSubscription?.plan_id === plan.id || currentSubscription?.status === 'rejected'}
+                    disabled={currentSubscription?.status === 'active' && currentSubscription?.plan_id === plan.id}
                     sx={{
-                      backgroundColor: currentSubscription?.plan_id === plan.id ? 
-                        currentSubscription.status === 'pending' ? '#ffa726' : '#e0e0e0' 
-                        : undefined,
-                      pointerEvents: currentSubscription?.plan_id === plan.id ? 'none' : 'auto',
-                      '&:hover': {
-                        backgroundColor: currentSubscription?.plan_id === plan.id ? 
-                          currentSubscription.status === 'pending' ? '#ffa726' : '#e0e0e0' 
-                          : undefined
-                      }
+                      backgroundColor: currentSubscription?.status === 'pending' && currentSubscription?.plan_id === plan.id ? '#ffa726' : undefined
                     }}
                   >
                     {currentSubscription?.status === 'rejected' ? 'OPEN LIVE CHAT' :

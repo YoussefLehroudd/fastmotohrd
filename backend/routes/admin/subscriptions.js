@@ -130,7 +130,16 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
         );
       }
 
-      // Update new subscription status and transfer the listings count
+      // Get current motor count for this seller
+      const [currentMotors] = await db.query(
+        `SELECT COUNT(*) as count 
+         FROM motors 
+         WHERE sellerId = ? 
+         AND status != 'deleted'`,
+        [subscription[0].seller_id]
+      );
+
+      // Update new subscription status with current motor count
       await db.query(
         `UPDATE seller_subscriptions 
          SET status = 'active',
@@ -141,7 +150,7 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
              is_trial_used = false,
              listings_used = ?
          WHERE id = ?`,
-        [endDate, currentSub.length > 0 ? currentSub[0].listings_used : motorCount[0].count, id]
+        [endDate, currentMotors[0].count, id]
       );
 
       // Get seller's email
