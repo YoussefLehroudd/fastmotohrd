@@ -103,6 +103,15 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
         );
       }
 
+      // Get count of seller's active motors
+      const [motorCount] = await db.query(
+        `SELECT COUNT(*) as count 
+         FROM motors 
+         WHERE sellerId = ? 
+         AND status != 'deleted'`,
+        [subscription[0].seller_id]
+      );
+
       // Update new subscription status
       await db.query(
         `UPDATE seller_subscriptions 
@@ -111,10 +120,16 @@ router.post('/:id/approve', authenticateAdmin, async (req, res) => {
              end_date = ?,
              updated_at = CURRENT_TIMESTAMP,
              is_trial = false,
-             is_trial_used = false
+             is_trial_used = false,
+             listings_used = ?
          WHERE id = ?`,
-        [endDate, id]
+        [endDate, motorCount[0].count, id]
       );
+
+      // Verify motor count doesn't exceed plan limit
+      if (plan[0].max_listings !== null && motorCount[0].count > plan[0].max_listings) {
+        throw new Error(`Cannot activate subscription: Seller has ${motorCount[0].count} motors but plan only allows ${plan[0].max_listings}`);
+      }
 
       // Get seller's email
       const [seller] = await db.query(
