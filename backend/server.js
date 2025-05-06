@@ -38,8 +38,6 @@ const { generateOTP, sendLoginOTP, sendPasswordResetOTP, sendPasswordChangeNotif
 dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 
-// Start subscription expiry checker
-require('./check-expired-subscriptions');
 
 app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 app.use(cors({ 
@@ -743,80 +741,6 @@ app.delete('/api/motors/:id', verifyToken, async (req, res) => {
 // Initialize socket service
 const { initializeSocket } = require('./utils/socketService');
 
-// Check for expired subscriptions every minute
-setInterval(async () => {
-  try {
-    // Update expired subscriptions that don't have a newer active subscription
-    await db.query(`
-      UPDATE seller_subscriptions s1
-      SET status = 'expired'
-      WHERE (
-        (status = 'active' AND end_date IS NOT NULL AND end_date <= CURRENT_TIMESTAMP)
-        OR
-        (status = 'active' AND is_trial = true AND trial_ends_at <= CURRENT_TIMESTAMP)
-      )
-      AND NOT EXISTS (
-        SELECT 1 
-        FROM seller_subscriptions s2 
-        WHERE s2.seller_id = s1.seller_id 
-        AND s2.id > s1.id 
-        AND s2.status = 'active'
-      )
-    `);
-
-    // Get newly expired subscriptions with all details
-    const [expiredSubs] = await db.query(`
-      SELECT s.*, p.name as plan_name, p.price, p.duration_months, p.max_listings, u.email
-      FROM seller_subscriptions s
-      JOIN subscription_plans p ON s.plan_id = p.id
-      JOIN users u ON s.seller_id = u.id
-      WHERE s.status = 'expired'
-      AND NOT EXISTS (
-        SELECT 1 FROM notifications n 
-        WHERE n.userId = s.seller_id 
-        AND n.type = 'subscription_expired'
-        AND JSON_EXTRACT(n.content, '$.subscription_id') = s.id
-      )
-      AND NOT EXISTS (
-        SELECT 1 
-        FROM seller_subscriptions s2 
-        WHERE s2.seller_id = s.seller_id 
-        AND s2.id > s.id 
-        AND s2.status = 'active'
-      )
-    `);
-
-    // Insert notifications for newly expired subscriptions
-    for (const sub of expiredSubs) {
-      await db.query(`
-        INSERT INTO notifications (userId, type, content, created_at)
-        VALUES (?, 'subscription_expired', ?, CURRENT_TIMESTAMP)
-      `, [
-        sub.seller_id,
-        `Your ${sub.plan_name} subscription has expired. Please renew to continue using all features.`
-      ]);
-
-      // Send email notification
-      const { sendSubscriptionEmail } = require('./utils/emailService');
-      await sendSubscriptionEmail(sub.email, {
-        type: 'expired',
-        planName: sub.plan_name,
-        price: sub.price,
-        duration: sub.duration_months === 1 ? '1 month' : `${sub.duration_months} months`,
-        maxListings: sub.max_listings
-      });
-
-      // Emit socket event to notify seller
-      const io = require('./utils/socketService').getIO();
-      io.to(`seller_${sub.seller_id}`).emit('subscription_update', {
-        type: 'expired',
-        subscription: sub
-      });
-    }
-  } catch (error) {
-    console.error('Error checking subscriptions:', error);
-  }
-}, 60000); // Check every minute
 
 // Register all routes
 const authRoutes = require('./routes/auth');

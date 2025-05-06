@@ -349,11 +349,6 @@ router.delete('/:id', authenticateAdmin, async (req, res) => {
         throw new Error('Subscription not found');
       }
 
-      // Delete subscription events
-      await db.query(
-        'DELETE FROM subscription_events WHERE subscription_id = ?',
-        [id]
-      );
 
       // Delete notifications related to this subscription
       await db.query(

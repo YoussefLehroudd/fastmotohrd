@@ -27,8 +27,6 @@ const updateUserStatus = (userId, isOnline) => {
 const initializeSocket = (socketIo) => {
   io = socketIo;
 
-  // Start checking for subscription events
-  checkSubscriptionEvents();
 
   // Authentication middleware
   io.use((socket, next) => {
@@ -57,64 +55,6 @@ const initializeSocket = (socketIo) => {
   io.on('connection', handleConnection);
 };
 
-// Check for subscription events every second
-const processedEventIds = new Set(); 
-
-const checkSubscriptionEvents = async () => {
-  setInterval(async () => {
-    try {
-      const [events] = await db.query(`
-        SELECT se.*, 
-               EXISTS (
-                 SELECT 1 
-                 FROM seller_subscriptions s2 
-                 WHERE s2.seller_id = se.seller_id 
-                 AND s2.status = 'active'
-                 AND s2.created_at > se.created_at
-               ) as has_newer_active
-        FROM subscription_events se
-        WHERE se.processed = FALSE
-        ORDER BY se.created_at ASC
-      `);
-
-      for (const event of events) {
-        if (processedEventIds.has(event.id)) continue;
-        processedEventIds.add(event.id);
-
-        if (event.event_type === 'expired' && event.has_newer_active) {
-          await db.query('UPDATE subscription_events SET processed = TRUE WHERE id = ?', [event.id]);
-          continue;
-        }
-
-        const [subscription] = await db.query(`
-          SELECT s.*, p.name, p.max_listings
-          FROM seller_subscriptions s
-          JOIN subscription_plans p ON s.plan_id = p.id
-          WHERE s.id = ?
-        `, [event.subscription_id]);
-
-        if (subscription.length > 0) {
-          const currentStatus = subscription[0].status;
-          if ((event.event_type === 'expired' && currentStatus === 'expired') ||
-              (event.event_type !== 'expired' && currentStatus !== 'expired')) {
-            io.to(`seller_${event.seller_id}`).emit('subscription_update', {
-              type: event.event_type,
-              subscription: {
-                ...subscription[0],
-                status: currentStatus,
-                plan_name: subscription[0].name
-              }
-            });
-          }
-        }
-
-        await db.query('UPDATE subscription_events SET processed = TRUE WHERE id = ?', [event.id]);
-      }
-    } catch (error) {
-      console.error('Error checking subscription events:', error);
-    }
-  }, 1000);
-};
 
 const handleConnection = async (socket) => {
   const userId = socket.user.id;
