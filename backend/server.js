@@ -740,6 +740,80 @@ app.delete('/api/motors/:id', verifyToken, async (req, res) => {
 
 // Initialize socket service
 const { initializeSocket } = require('./utils/socketService');
+const { sendSubscriptionEmail } = require('./utils/emailService');
+
+// Watch for subscription events and send emails
+const watchSubscriptionEvents = async () => {
+  try {
+    // Get one unprocessed subscription event
+    const [events] = await db.query(`
+      SELECT e.*, u.email 
+      FROM subscription_events e
+      JOIN users u ON e.seller_id = u.id
+      WHERE e.processed = 0
+      AND e.event_type = 'subscription_expired'
+      AND NOT EXISTS (
+        SELECT 1 FROM subscription_events e2
+        WHERE e2.seller_id = e.seller_id
+        AND e2.event_type = e.event_type
+        AND e2.processed = 1
+        AND e2.event_date = e.event_date
+      )
+      ORDER BY e.created_at ASC
+      LIMIT 1
+    `);
+
+    if (events.length > 0) {
+      const event = events[0];
+      const data = JSON.parse(event.data);
+
+      // Step 2: Update the event to mark it as processed
+      await db.query(
+        'UPDATE subscription_events SET processed = -1 WHERE id = ?',
+        [event.id]
+      );
+
+      // Step 3: Send email with complete subscription details
+      console.log('Sending email to:', event.email);
+      await sendSubscriptionEmail(event.email, {
+        type: 'expired',
+        planName: data.plan_name,
+        price: data.price,
+        duration: data.duration,
+        maxListings: data.max_listings,
+        endDate: data.end_date
+      });
+
+
+      // Step 4: Mark any other events for this seller today as processed to prevent duplicates
+      await db.query(
+        `UPDATE subscription_events 
+         SET processed = 1 
+         WHERE seller_id = ? 
+         AND event_type = 'subscription_expired' 
+         AND DATE(created_at) = CURRENT_DATE`,
+        [event.seller_id]
+      );
+
+      // Emit socket event (optional, if you want to notify the frontend)
+      const io = getIO();
+      io.to(`seller_${event.seller_id}`).emit('subscription_update', {
+        type: 'expired',
+        subscription: event
+      });
+
+      console.log('Event processed and email sent successfully');
+    } else {
+      console.log('No unprocessed events found');
+    }
+  } catch (error) {
+    console.error('Error processing subscription events:', error);
+  }
+};
+
+// Check for subscription events every second
+setInterval(watchSubscriptionEvents, 1000);
+
 
 
 // Register all routes
@@ -753,6 +827,7 @@ const notificationsRoutes = require('./routes/notifications');
 const reviewsRoutes = require('./routes/reviews_updated');
 const paymentsRoutes = require('./routes/payments');
 const subscriptionRoutes = require('./routes/subscriptions');
+const subscriptionExpireRoutes = require('./routes/subscriptions/expire');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
@@ -770,6 +845,7 @@ app.use('/api/motors/:motorId/reviews', (req, res, next) => {
 }, reviewsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/subscriptions', subscriptionExpireRoutes);
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/admin', require('./routes/admin/chat'));
 app.use('/api/tracking', require('./routes/tracking'));

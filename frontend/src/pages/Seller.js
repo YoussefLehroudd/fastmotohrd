@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import useSubscriptionStatus from '../hooks/useSubscriptionStatus';
 import {
   Box,
   Container,
@@ -45,6 +46,7 @@ import SellerReviews from '../components/SellerReviews';
 import SellerSubscription from '../components/SellerSubscription';
 
 const Seller = () => {
+  const { subscriptionStatus } = useSubscriptionStatus();
   const [motors, setMotors] = useState([]);
   const [open, setOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -745,17 +747,35 @@ const Seller = () => {
                   )}
                 </Grid>
                 <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        name="isActive"
-                        checked={Boolean(formData.isActive)}
-                        onChange={handleChange}
-                        color="primary"
-                      />
-                    }
-                    label="Available for Rent"
-                  />
+                  <Box>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          name="isActive"
+                          checked={subscriptionStatus === 'expired' ? false : Boolean(formData.isActive)}
+                          onChange={(e) => {
+                            if (subscriptionStatus === 'expired') {
+                              setError({
+                                show: true,
+                                message: 'Active subscription required to make motors available for rent',
+                                requiresSubscription: true
+                              });
+                              return;
+                            }
+                            handleChange(e);
+                          }}
+                          color="primary"
+                          disabled={subscriptionStatus === 'expired'}
+                        />
+                      }
+                      label="Available for Rent"
+                    />
+                    {subscriptionStatus === 'expired' && (
+                      <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                        Active subscription required to make motors available for rent
+                      </Typography>
+                    )}
+                  </Box>
                 </Grid>
               </Grid>
             </DialogContent>

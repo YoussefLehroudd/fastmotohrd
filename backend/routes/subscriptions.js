@@ -174,18 +174,13 @@ router.post('/request', verifyToken, async (req, res) => {
         [req.user.id]
       );
 
-      // Check if this is a downgrade (moving to a plan with fewer listings)
-      const isDowngrade = currentSub.length > 0 && 
-        (currentSub[0].current_max_listings === null || // Current plan is unlimited
-         (plan.max_listings !== null && plan.max_listings < currentSub[0].current_max_listings));
-
-      // If downgrading and have more motors than new plan allows, reject
-      if (isDowngrade && plan.max_listings !== null && motorCount[0].count > plan.max_listings) {
+      // Check if motor count exceeds plan limit
+      if (plan.max_listings !== null && motorCount[0].count > plan.max_listings) {
         const excessMotors = motorCount[0].count - plan.max_listings;
         return res.status(400).json({
-          message: `Cannot downgrade from ${currentSub[0].current_plan_name} to ${plan.name}: ` +
+          message: `Cannot subscribe to ${plan.name} plan: ` +
                   `You currently have ${motorCount[0].count} motors. ` +
-                  `Please remove ${excessMotors} motor${excessMotors > 1 ? 's' : ''} before downgrading to a plan that only allows ${plan.max_listings} motors.`
+                  `Please remove ${excessMotors} motor${excessMotors > 1 ? 's' : ''} to match the plan limit of ${plan.max_listings} motors.`
         });
       }
 
