@@ -52,6 +52,8 @@ router.get('/', verifyToken, async (req, res) => {
         COALESCE(SUM(CASE WHEN p.status = 'pending' THEN p.amount ELSE 0 END), 0) as pendingPayments,
         COALESCE(SUM(CASE WHEN p.status = 'validated' THEN p.amount ELSE 0 END), 0) as completedPayments,
         COALESCE(SUM(CASE WHEN p.status = 'validated' AND b.created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH) THEN p.amount ELSE 0 END), 0) as monthlyRevenue,
+        COALESCE(SUM(CASE WHEN p.status = 'validated' AND YEARWEEK(b.created_at) = YEARWEEK(NOW()) THEN p.amount ELSE 0 END), 0) as weeklyRevenue,
+        COALESCE(SUM(CASE WHEN p.status = 'validated' AND DATE(b.created_at) = CURDATE() THEN p.amount ELSE 0 END), 0) as dailyRevenue,
         COALESCE(SUM(CASE WHEN p.status = 'validated' THEN p.amount ELSE 0 END), 0) as totalRevenue
        FROM payments p
        JOIN bookings b ON p.bookingId = b.id

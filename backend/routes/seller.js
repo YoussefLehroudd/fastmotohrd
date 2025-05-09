@@ -154,13 +154,16 @@ router.get('/stats', verifyToken, async (req, res) => {
       [sellerId]
     );
 
-    // Get total revenue
+    // Get total revenue (including all payments)
     const [revenue] = await db.query(
-      `SELECT COALESCE(SUM(p.amount), 0) as total 
+      `SELECT 
+        COALESCE(SUM(p.amount), 0) as total,
+        COALESCE(SUM(CASE WHEN p.status = 'paid' THEN p.amount ELSE 0 END), 0) as paid,
+        COALESCE(SUM(CASE WHEN p.status = 'pending' THEN p.amount ELSE 0 END), 0) as pending
        FROM payments p 
        JOIN bookings b ON p.bookingId = b.id 
        JOIN motors m ON b.motorId = m.id 
-       WHERE m.sellerId = ? AND p.status = 'paid'`,
+       WHERE m.sellerId = ?`,
       [sellerId]
     );
 
@@ -293,6 +296,10 @@ router.get('/payments', verifyToken, async (req, res) => {
           WHEN p.status = 'paid' 
           AND MONTH(p.created_at) = MONTH(CURRENT_DATE) 
           THEN p.amount ELSE 0 END), 0) as monthlyRevenue,
+        COALESCE(SUM(CASE 
+          WHEN p.status = 'paid'
+          AND YEARWEEK(p.created_at) = YEARWEEK(CURRENT_DATE)
+          THEN p.amount ELSE 0 END), 0) as weeklyRevenue,
         COALESCE(SUM(CASE 
           WHEN p.status = 'pending'
           THEN p.amount ELSE 0 END), 0) as pendingPayments,

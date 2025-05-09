@@ -804,7 +804,7 @@ const watchSubscriptionEvents = async () => {
 
       console.log('Event processed and email sent successfully');
     } else {
-      console.log('No unprocessed events found');
+      // console.log('No unprocessed events found');
     }
   } catch (error) {
     console.error('Error processing subscription events:', error);
