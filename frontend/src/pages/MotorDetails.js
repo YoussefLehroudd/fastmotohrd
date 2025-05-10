@@ -469,16 +469,16 @@ const MotorDetails = () => {
                     .sort((a, b) => b.similarityScore - a.similarityScore);
 
                   const settings = {
-                    dots: true,
-                    infinite: true,
+                    dots: similarMotors.length > 1,
+                    infinite: similarMotors.length > 1,
                     speed: 1000,
-                    slidesToShow: 3,
+                    slidesToShow: Math.min(3, similarMotors.length),
                     slidesToScroll: 1,
-                    autoplay: true,
+                    autoplay: similarMotors.length > 1,
                     autoplaySpeed: 4000,
                     pauseOnHover: true,
                     cssEase: "linear",
-                    arrows: true,
+                    arrows: similarMotors.length > 1,
                     nextArrow: <ChevronRightIcon sx={{ 
                       fontSize: 40, 
                       color: '#1976d2', 
@@ -519,9 +519,9 @@ const MotorDetails = () => {
                       {
                         breakpoint: 1024,
                         settings: {
-                          slidesToShow: 2,
+                          slidesToShow: Math.min(2, similarMotors.length),
                           slidesToScroll: 1,
-                          arrows: true
+                          arrows: similarMotors.length > 1
                         }
                       },
                       {
@@ -530,7 +530,7 @@ const MotorDetails = () => {
                           slidesToShow: 1,
                           slidesToScroll: 1,
                           arrows: false,
-                          dots: true
+                          dots: similarMotors.length > 1
                         }
                       }
                     ]

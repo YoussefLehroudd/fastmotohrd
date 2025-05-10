@@ -3,7 +3,7 @@ const { sendSubscriptionEmail } = require('./utils/emailService');
 
 async function checkExpiredSubscriptions() {
   try {
-    // Get subscriptions that are about to expire
+    // Get subscriptions that are about to expire and haven't been processed yet
     const [subscriptions] = await db.query(`
       SELECT s.*, u.email, p.name as plan_name, p.price, p.duration_months, p.max_listings
       FROM seller_subscriptions s
@@ -14,6 +14,12 @@ async function checkExpiredSubscriptions() {
         (s.is_trial = true AND s.trial_ends_at <= CURRENT_TIMESTAMP)
         OR 
         (s.is_trial = false AND s.end_date <= CURRENT_TIMESTAMP)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM subscription_events e
+        WHERE e.seller_id = s.seller_id
+        AND e.event_type = 'SUBSCRIPTION_EXPIRED'
+        AND DATE(e.created_at) = CURRENT_DATE
       )
     `);
 
@@ -49,6 +55,24 @@ async function checkExpiredSubscriptions() {
         ]
       );
 
+      // Create subscription event
+      await db.query(
+        `INSERT INTO subscription_events (seller_id, event_type, data, processed, event_date)
+         VALUES (?, 'SUBSCRIPTION_EXPIRED', ?, false, NOW())`,
+        [
+          subscription.seller_id,
+          JSON.stringify({
+            email: subscription.email,
+            type: 'expired',
+            plan_name: subscription.plan_name,
+            price: subscription.price,
+            duration: subscription.duration_months === 1 ? '1 month' : `${subscription.duration_months} months`,
+            max_listings: subscription.max_listings,
+            end_date: subscription.end_date
+          })
+        ]
+      );
+
       // Send email notification
       await sendSubscriptionEmail(subscription.email, {
         type: 'expired',
@@ -58,13 +82,13 @@ async function checkExpiredSubscriptions() {
         maxListings: subscription.max_listings
       });
 
-      console.log(`Subscription ${subscription.id} expired and notification sent to ${subscription.email}`);
+      console.log(`Subscription ${subscription.id} expired, event created, and notification sent to ${subscription.email}`);
     }
   } catch (error) {
     console.error('Error checking expired subscriptions:', error);
   }
 }
 
-// Run immediately and then every minute
+// Run immediately and then every second
 checkExpiredSubscriptions();
-setInterval(checkExpiredSubscriptions, 60000);
+setInterval(checkExpiredSubscriptions, 1000);
